@@ -121,6 +121,18 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Output directory (default: output)",
     )
 
+    # --- mcp ---
+    mcp = subparsers.add_parser(
+        "mcp",
+        help="Start the MCP (Model Context Protocol) server for AI agent access",
+    )
+    mcp.add_argument(
+        "--output", "-o",
+        type=Path,
+        default=Path("output"),
+        help="Output directory containing the knowledge base (default: output)",
+    )
+
     return parser
 
 
@@ -221,6 +233,22 @@ def cmd_stats(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_mcp(args: argparse.Namespace) -> int:
+    """Start the MCP server."""
+    from mindforge.mcp.server import create_server
+
+    config = MindForgeConfig(output_dir=args.output)
+
+    manifest = config.output_dir / "concepts.json"
+    if not manifest.exists():
+        print("No knowledge base found. Run 'mindforge ingest' first.", file=sys.stderr)
+        return 1
+
+    server = create_server(config)
+    server.run()
+    return 0
+
+
 def main() -> int:
     parser = _build_parser()
     args = parser.parse_args()
@@ -233,6 +261,7 @@ def main() -> int:
         "ingest": cmd_ingest,
         "query": cmd_query,
         "stats": cmd_stats,
+        "mcp": cmd_mcp,
     }
 
     handler = commands.get(args.command)
