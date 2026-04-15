@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "mindforge"
+version = "0.1.0"
+description = "A semantic memory engine that transforms AI conversation transcripts into a structured, queryable knowledge base."
+requires-python = ">=3.10"
+license = { text = "GPL-3.0-or-later" }
+
+dependencies = [
+    "networkx>=3.0",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+embeddings = [
+    "sentence-transformers>=2.2.0",
+    "faiss-cpu>=1.7.0",
+    "numpy>=1.24.0",
+]
+all = [
+    "mindforge[embeddings]",
+]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+]
+
+[project.scripts]
+mindforge = "mindforge.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["mindforge*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
