@@ -53,6 +53,35 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Similarity threshold for deduplication (default: 0.75)",
     )
 
+    # LLM extraction options
+    llm_group = ingest.add_argument_group("LLM extraction")
+    llm_group.add_argument(
+        "--llm",
+        action="store_true",
+        help="Use LLM-assisted concept extraction (requires Ollama or API)",
+    )
+    llm_group.add_argument(
+        "--llm-provider",
+        choices=["ollama", "openai"],
+        default="ollama",
+        help="LLM provider (default: ollama)",
+    )
+    llm_group.add_argument(
+        "--llm-model",
+        default="llama3.2",
+        help="LLM model name (default: llama3.2)",
+    )
+    llm_group.add_argument(
+        "--llm-base-url",
+        default="",
+        help="LLM API base URL (default: auto-detect from provider)",
+    )
+    llm_group.add_argument(
+        "--llm-api-key",
+        default="",
+        help="API key for OpenAI-compatible providers",
+    )
+
     # --- query ---
     query = subparsers.add_parser(
         "query",
@@ -102,11 +131,18 @@ def cmd_ingest(args: argparse.Namespace) -> int:
         output_dir=args.output,
         use_embeddings=args.embeddings,
         similarity_threshold=args.similarity_threshold,
+        use_llm=args.llm,
+        llm_provider=args.llm_provider,
+        llm_model=args.llm_model,
+        llm_base_url=args.llm_base_url,
+        llm_api_key=args.llm_api_key,
     )
 
     print(f"MindForge v0.1.0")
     print(f"Input:  {config.transcripts_dir.resolve()}")
     print(f"Output: {config.output_dir.resolve()}")
+    if config.use_llm:
+        print(f"LLM:    {config.llm_provider}/{config.llm_model}")
     print()
 
     pipeline = MindForgePipeline(config)
