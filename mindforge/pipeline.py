@@ -18,9 +18,12 @@ from mindforge.distillation.renderer import write_all_concepts
 from mindforge.embeddings.index import EmbeddingIndex
 from mindforge.graph.builder import KnowledgeGraph
 from mindforge.ingestion.chunker import chunk_turns
-from mindforge.ingestion.extractor import extract_concepts
+from mindforge.ingestion.extractor import RawConcept, extract_concepts
 from mindforge.ingestion.parser import parse_all_transcripts
 from mindforge.linking.linker import detect_links
+from mindforge.llm.client import LLMClient, LLMConfig
+from mindforge.llm.distiller import distill_all_smart
+from mindforge.llm.extractor import extract_concepts_llm
 from mindforge.query.engine import QueryEngine
 
 
@@ -32,11 +35,13 @@ class PipelineResult:
     concept_files_written: int
     edges_in_graph: int
     embeddings_built: bool
+    extraction_method: str = "heuristic"
 
     def summary(self) -> str:
         lines = [
             "MindForge Pipeline Complete",
             "=" * 40,
+            f"  Extraction method:       {self.extraction_method}",
             f"  Concepts extracted:      {self.concepts_extracted}",
             f"  After deduplication:     {self.concepts_after_dedup}",
             f"  Markdown files written:  {self.concept_files_written}",
@@ -79,7 +84,14 @@ class MindForgePipeline:
             all_chunks.extend(chunks)
         print(f"  Generated {len(all_chunks)} semantic chunks")
 
-        raw_concepts = extract_concepts(all_chunks)
+        extraction_method = "heuristic"
+        raw_concepts: list[RawConcept] = []
+
+        if self.config.use_llm:
+            raw_concepts, extraction_method = self._extract_with_llm(all_chunks)
+        else:
+            raw_concepts = extract_concepts(all_chunks)
+
         print(f"  Extracted {len(raw_concepts)} candidate concepts")
 
         # === Stage 3: Deduplication ===
@@ -92,7 +104,8 @@ class MindForgePipeline:
 
         # === Stage 4: Distillation ===
         print("[4/6] Distilling concepts...")
-        concepts = distill_all(deduped)
+        # Use smart distiller that handles both LLM and heuristic concepts
+        concepts = distill_all_smart(deduped)
 
         # Add to store (handles merging with existing concepts)
         for concept in concepts:
@@ -146,6 +159,7 @@ class MindForgePipeline:
             concept_files_written=len(written),
             edges_in_graph=stats["edges"],
             embeddings_built=embeddings_built,
+            extraction_method=extraction_method,
         )
 
     def query(self, question: str, top_k: int = 5) -> str:
@@ -158,6 +172,50 @@ class MindForgePipeline:
 
         results = self.query_engine.search(question, top_k=top_k)
         return self.query_engine.format_results(results)
+
+    def _extract_with_llm(
+        self,
+        chunks: list,
+    ) -> tuple[list[RawConcept], str]:
+        """Attempt LLM extraction, falling back to heuristic if unavailable.
+
+        Returns (concepts, extraction_method_name).
+        """
+        llm_config = LLMConfig(
+            provider=self.config.llm_provider,
+            model=self.config.llm_model,
+            base_url=self.config.llm_base_url,
+            api_key=self.config.llm_api_key,
+        )
+        client = LLMClient(llm_config)
+
+        if not client.available:
+            print(f"  LLM server not reachable ({llm_config.base_url})")
+            print("  Falling back to heuristic extraction")
+            return extract_concepts(chunks), "heuristic (LLM unavailable)"
+
+        print(f"  Using LLM: {llm_config.provider}/{llm_config.model}")
+        llm_concepts, stats = extract_concepts_llm(chunks, client)
+
+        if stats.parse_failures > 0:
+            print(f"  Warning: {stats.parse_failures} LLM parse failure(s)")
+
+        # Also run heuristic extraction and merge (LLM may miss things
+        # that pattern matching catches, and vice versa)
+        heuristic_concepts = extract_concepts(chunks)
+        print(f"  LLM extracted {len(llm_concepts)} concepts, "
+              f"heuristic found {len(heuristic_concepts)}")
+
+        # Merge: LLM concepts take priority, then add unique heuristic ones
+        seen_names = {c.name.lower() for c in llm_concepts}
+        merged = list(llm_concepts)
+        for hc in heuristic_concepts:
+            if hc.name.lower() not in seen_names:
+                seen_names.add(hc.name.lower())
+                merged.append(hc)
+
+        method = f"llm ({llm_config.provider}/{llm_config.model}) + heuristic"
+        return merged, method
 
     def _load_state(self) -> None:
         """Load previously built state from disk."""

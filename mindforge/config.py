@@ -22,6 +22,13 @@ class MindForgeConfig:
     # Linking
     link_confidence_threshold: float = 0.3
 
+    # LLM extraction (optional)
+    use_llm: bool = False
+    llm_provider: str = "ollama"  # "ollama" or "openai"
+    llm_model: str = "llama3.2"
+    llm_base_url: str = ""  # Auto-set based on provider if empty
+    llm_api_key: str = ""  # Required for OpenAI provider
+
     # Embeddings (optional)
     embedding_model: str = "all-MiniLM-L6-v2"
     use_embeddings: bool = False
