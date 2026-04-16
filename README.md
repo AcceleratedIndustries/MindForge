@@ -142,6 +142,8 @@ mindforge/
 │   ├── client.py           # Ollama + OpenAI HTTP client (stdlib only)
 │   ├── extractor.py        # LLM-based concept extraction
 │   └── distiller.py        # LLM-aware concept distillation
+├── mcp/
+│   └── server.py           # MCP server (JSON-RPC over stdio)
 ├── distillation/
 │   ├── concept.py          # Data models (Concept, Relationship, ConceptStore)
 │   ├── deduplicator.py     # Similarity-based deduplication
@@ -230,9 +232,43 @@ MindForge tracks eight types of concept relationships:
 
 ---
 
+## MCP Server (AI Agent Interface)
+
+MindForge includes an MCP (Model Context Protocol) server that lets external AI agents query your knowledge base as a tool.
+
+```bash
+# Start the MCP server
+mindforge mcp --output path/to/knowledge-base
+```
+
+**Available tools:**
+
+| Tool | Description |
+|------|-------------|
+| `search` | Natural language search across all concepts |
+| `get_concept` | Get full details of a concept by name or slug |
+| `list_concepts` | List all concepts, optionally filtered by tag |
+| `get_neighbors` | Get related concepts via the knowledge graph |
+| `get_stats` | Knowledge base statistics and most central concepts |
+
+**Claude Desktop configuration** (`claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "mindforge": {
+      "command": "mindforge",
+      "args": ["mcp", "--output", "/path/to/your/output"]
+    }
+  }
+}
+```
+
+---
+
 ## Roadmap
 
-- [ ] **MCP server interface** -- Expose the knowledge base as a tool server for external AI agents
+- [x] **MCP server interface** -- Expose the knowledge base as a tool server for external AI agents
 - [ ] **Incremental ingestion** -- Content hashing to skip already-processed transcripts
 - [ ] **Concept versioning** -- Track how concepts evolve across ingestion runs
 - [ ] **Confidence decay** -- Unreinforced concepts fade over time, surfacing review candidates
