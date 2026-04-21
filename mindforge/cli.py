@@ -133,6 +133,18 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Output directory containing the knowledge base (default: output)",
     )
 
+    # --- review ---
+    review = subparsers.add_parser(
+        "review",
+        help="Walk the hygiene review queue (conflicts, stale, orphans)",
+    )
+    review.add_argument(
+        "--output", "-o",
+        type=Path,
+        default=Path("output"),
+        help="Output directory (default: output)",
+    )
+
     # --- eval ---
     ev = subparsers.add_parser(
         "eval",
@@ -272,6 +284,37 @@ def cmd_stats(args: argparse.Namespace) -> int:
                 name = concept.name if concept else slug
                 print(f"    {name}: {centrality:.3f}")
 
+    # Review queue summary (Phase 1.3).
+    from collections import Counter
+
+    from mindforge.hygiene.review_queue import build_review_queue
+
+    queue = build_review_queue(store, half_life_days=config.decay_half_life_days)
+    if queue:
+        counts = Counter(item["reason"] for item in queue)
+        print()
+        print("  Review queue:")
+        print(f"    Conflicted:  {counts.get('conflicted', 0)}")
+        print(f"    Stale:       {counts.get('stale', 0)}")
+        print(f"    Orphaned:    {counts.get('orphaned', 0)}")
+
+    return 0
+
+
+def cmd_review(args: argparse.Namespace) -> int:
+    """Walk the hygiene review queue."""
+    from mindforge.distillation.concept import ConceptStore
+    from mindforge.hygiene.tui import review_loop
+
+    config = MindForgeConfig(output_dir=args.output)
+    manifest = config.output_dir / "concepts.json"
+    if not manifest.exists():
+        print("No knowledge base found. Run 'mindforge ingest' first.", file=sys.stderr)
+        return 1
+
+    store = ConceptStore.load(manifest)
+    review_loop(store, half_life_days=config.decay_half_life_days)
+    store.save(manifest)
     return 0
 
 
@@ -357,6 +400,7 @@ def main() -> int:
         "mcp": cmd_mcp,
         "show": cmd_show,
         "eval": cmd_eval,
+        "review": cmd_review,
     }
 
     handler = commands.get(args.command)

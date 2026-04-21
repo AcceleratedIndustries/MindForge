@@ -84,7 +84,7 @@ def distill_concept(
     if chunk_map:
         sources = _build_source_refs(raw.source_chunks, chunk_map)
 
-    return Concept(
+    concept = Concept(
         name=raw.name.strip(),
         definition=definition,
         explanation=explanation,
@@ -95,6 +95,18 @@ def distill_concept(
         confidence=raw.confidence,
         sources=sources,
     )
+
+    # Phase 1.3: flag conflicts when sources disagree at the insight level.
+    # Definition-level conflicts need multi-source aggregation that the current
+    # single-RawConcept flow does not see; insight contradictions catch the
+    # common cases (unit/quantifier mismatches from the contradiction fixture).
+    if insights:
+        from mindforge.hygiene.conflict_detector import detect_insight_conflicts
+
+        if detect_insight_conflicts(insights):
+            concept.status = "conflicted"
+
+    return concept
 
 
 def _clean_content(text: str) -> str:

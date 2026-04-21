@@ -534,6 +534,14 @@ CONCEPT_TOOLS: list[Tool] = [
             "properties": {},
         },
     ),
+    Tool(
+        name="list_review_queue",
+        description="List concepts in the hygiene review queue (conflicted, stale, orphaned).",
+        inputSchema={
+            "type": "object",
+            "properties": {},
+        },
+    ),
 ]
 
 ALL_TOOLS = KB_TOOLS + SEARCH_TOOLS + CONCEPT_TOOLS
@@ -818,8 +826,20 @@ async def handle_tool(name: str, arguments: dict) -> list[TextContent | ImageCon
                         "centrality": round(centrality, 3),
                     })
                 stats["most_central"] = central
-        
+
         return [TextContent(type="text", text=json.dumps(stats, indent=2))]
+
+    elif name == "list_review_queue":
+        from mindforge.hygiene.review_queue import build_review_queue
+
+        try:
+            kb = manager.require_active()
+        except RuntimeError as e:
+            return [TextContent(type="text", text=str(e))]
+        if kb.store is None:
+            return [TextContent(type="text", text=json.dumps([]))]
+        items = build_review_queue(kb.store)
+        return [TextContent(type="text", text=json.dumps(items, indent=2))]
     
     else:
         return [TextContent(type="text", text=f"Unknown tool: {name}")]

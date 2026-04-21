@@ -130,6 +130,12 @@ class MindForgePipeline:
         for concept in concepts:
             self.store.add(concept)
 
+        # Stamp last_reinforced_at for hygiene bookkeeping.
+        from datetime import datetime, timezone
+        now_iso = datetime.now(timezone.utc).isoformat()
+        for concept in self.store.all():
+            concept.last_reinforced_at = now_iso
+
         # Save manifest
         manifest_path = self.config.output_dir / "concepts.json"
         self.store.save(manifest_path)

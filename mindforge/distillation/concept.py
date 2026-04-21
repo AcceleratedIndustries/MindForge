@@ -10,6 +10,12 @@ from pathlib import Path
 from mindforge.distillation.source_ref import SourceRef
 from mindforge.utils.text import slugify, content_hash
 
+# Late import to avoid a cycle: markers imports SourceRef (fine), and
+# concept.py would import markers (also fine), but tests sometimes load
+# partial modules. Importing here at module scope is safe because markers
+# itself has no concept.py dependency.
+from mindforge.hygiene.markers import ConflictMarker  # noqa: E402
+
 
 class RelationshipType(str, Enum):
     """Types of relationships between concepts."""
@@ -63,6 +69,10 @@ class Concept:
     links: list[str] = field(default_factory=list)  # wiki-link targets (slugs)
     relationships: list[Relationship] = field(default_factory=list)
     sources: list[SourceRef] = field(default_factory=list)
+    status: str = "active"  # active | conflicted | stale | orphaned
+    conflicts: list[ConflictMarker] = field(default_factory=list)
+    last_reinforced_at: str | None = None
+    last_reviewed_at: str | None = None
 
     @property
     def slug(self) -> str:
@@ -86,12 +96,17 @@ class Concept:
             "links": self.links,
             "relationships": [r.to_dict() for r in self.relationships],
             "sources": [s.to_dict() for s in self.sources],
+            "status": self.status,
+            "conflicts": [c.to_dict() for c in self.conflicts],
+            "last_reinforced_at": self.last_reinforced_at,
+            "last_reviewed_at": self.last_reviewed_at,
         }
 
     @classmethod
     def from_dict(cls, data: dict) -> Concept:
         rels = [Relationship.from_dict(r) for r in data.get("relationships", [])]
         sources = [SourceRef.from_dict(s) for s in data.get("sources", [])]
+        conflicts = [ConflictMarker.from_dict(c) for c in data.get("conflicts", [])]
         return cls(
             name=data["name"],
             definition=data["definition"],
@@ -104,6 +119,10 @@ class Concept:
             links=data.get("links", []),
             relationships=rels,
             sources=sources,
+            status=data.get("status", "active"),
+            conflicts=conflicts,
+            last_reinforced_at=data.get("last_reinforced_at"),
+            last_reviewed_at=data.get("last_reviewed_at"),
         )
 
     def merge_with(self, other: Concept) -> Concept:
