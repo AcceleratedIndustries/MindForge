@@ -124,3 +124,18 @@ def parse_all_transcripts(directory: Path) -> list[Transcript]:
         for path in sorted(directory.glob(ext)):
             transcripts.append(parse_transcript(path))
     return transcripts
+
+
+class MarkdownSourceAdapter:
+    """SourceAdapter for markdown and plain-text transcript files."""
+
+    def parse(self, path: Path) -> Transcript:
+        return parse_transcript(path)
+
+
+# Register at import time for .md and .txt. Late import avoids the
+# parser <-> sources circular import.
+from mindforge.ingestion import sources as _sources  # noqa: E402
+
+_sources.register_adapter(".md", MarkdownSourceAdapter)
+_sources.register_adapter(".txt", MarkdownSourceAdapter)
