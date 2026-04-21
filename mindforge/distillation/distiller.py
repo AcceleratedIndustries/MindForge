@@ -7,18 +7,60 @@ and produces clean, atomic, human-readable concept entries.
 from __future__ import annotations
 
 import re
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Optional
 
 from mindforge.distillation.concept import Concept
+from mindforge.distillation.source_ref import SourceRef
+from mindforge.ingestion.chunker import Chunk
 from mindforge.ingestion.extractor import RawConcept
 from mindforge.utils.text import (
     compute_text_similarity,
+    content_hash,
     extract_keywords,
     extract_sentences,
     normalize_whitespace,
 )
 
 
-def distill_concept(raw: RawConcept) -> Concept:
+def _build_source_refs(
+    chunk_ids: list[str],
+    chunk_map: dict[str, Chunk],
+) -> list[SourceRef]:
+    """Convert a list of chunk IDs + lookup map into deduplicated SourceRef entries."""
+    by_file: dict[str, list[Chunk]] = {}
+    for cid in chunk_ids:
+        chunk = chunk_map.get(cid)
+        if chunk is None:
+            continue
+        by_file.setdefault(chunk.source_file, []).append(chunk)
+
+    now = datetime.now(timezone.utc).isoformat()
+    refs: list[SourceRef] = []
+    for source_file, chunks in by_file.items():
+        try:
+            text = Path(source_file).read_text(encoding="utf-8")
+            h = content_hash(text)
+        except (OSError, UnicodeDecodeError):
+            h = ""
+        turn_indices = sorted({c.turn_index for c in chunks})
+        snippet = chunks[0].content if chunks else None
+        refs.append(SourceRef(
+            transcript_path=source_file,
+            transcript_hash=h,
+            turn_indices=turn_indices,
+            extracted_at=now,
+            chunk_id=chunks[0].id if chunks else None,
+            snippet=snippet,
+        ))
+    return refs
+
+
+def distill_concept(
+    raw: RawConcept,
+    chunk_map: Optional[dict[str, Chunk]] = None,
+) -> Concept:
     """Distill a raw concept into a clean, structured Concept.
 
     Performs:
@@ -27,6 +69,7 @@ def distill_concept(raw: RawConcept) -> Concept:
     3. Build the explanation
     4. Extract key insights as bullet points
     5. Identify any examples
+    6. Attach SourceRef citations when a chunk_map is provided
     """
     cleaned = _clean_content(raw.raw_content)
     sentences = extract_sentences(cleaned)
@@ -37,6 +80,10 @@ def distill_concept(raw: RawConcept) -> Concept:
     examples = _extract_examples(raw.raw_content)
     tags = extract_keywords(cleaned, top_n=5)
 
+    sources: list[SourceRef] = []
+    if chunk_map:
+        sources = _build_source_refs(raw.source_chunks, chunk_map)
+
     return Concept(
         name=raw.name.strip(),
         definition=definition,
@@ -46,6 +93,7 @@ def distill_concept(raw: RawConcept) -> Concept:
         tags=tags,
         source_files=raw.source_files,
         confidence=raw.confidence,
+        sources=sources,
     )
 
 
@@ -204,6 +252,9 @@ def _extract_examples(text: str) -> list[str]:
     return examples[:5]  # Cap at 5 examples
 
 
-def distill_all(raws: list[RawConcept]) -> list[Concept]:
+def distill_all(
+    raws: list[RawConcept],
+    chunk_map: Optional[dict[str, Chunk]] = None,
+) -> list[Concept]:
     """Distill all raw concepts into clean Concepts."""
-    return [distill_concept(raw) for raw in raws]
+    return [distill_concept(raw, chunk_map) for raw in raws]

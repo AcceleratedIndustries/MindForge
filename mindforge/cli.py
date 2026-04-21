@@ -133,6 +133,24 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Output directory containing the knowledge base (default: output)",
     )
 
+    # --- show ---
+    show = subparsers.add_parser(
+        "show",
+        help="Show a single concept by slug",
+    )
+    show.add_argument("slug", help="Concept slug to display")
+    show.add_argument(
+        "--sources",
+        action="store_true",
+        help="Print source citations (transcript paths + turn indices)",
+    )
+    show.add_argument(
+        "--output", "-o",
+        type=Path,
+        default=Path("output"),
+        help="Output directory (default: output)",
+    )
+
     return parser
 
 
@@ -233,6 +251,35 @@ def cmd_stats(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_show(args: argparse.Namespace) -> int:
+    """Show a single concept, optionally with source citations."""
+    from mindforge.distillation.concept import ConceptStore
+
+    config = MindForgeConfig(output_dir=args.output)
+    manifest = config.output_dir / "concepts.json"
+    if not manifest.exists():
+        print("No knowledge base found. Run 'mindforge ingest' first.", file=sys.stderr)
+        return 1
+
+    store = ConceptStore.load(manifest)
+    concept = store.get(args.slug)
+    if not concept:
+        print(f"Unknown concept: {args.slug}", file=sys.stderr)
+        return 1
+
+    print(concept.name)
+    print(f"  {concept.definition}")
+    if args.sources:
+        if concept.sources:
+            print("Sources:")
+            for s in concept.sources:
+                turns = ", ".join(str(i) for i in s.turn_indices)
+                print(f"  {s.transcript_path} (turns {turns})")
+        else:
+            print("Sources: (none)")
+    return 0
+
+
 def cmd_mcp(args: argparse.Namespace) -> int:
     """Start the multi-KB MCP server.
 
@@ -261,6 +308,7 @@ def main() -> int:
         "query": cmd_query,
         "stats": cmd_stats,
         "mcp": cmd_mcp,
+        "show": cmd_show,
     }
 
     handler = commands.get(args.command)

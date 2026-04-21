@@ -715,6 +715,7 @@ async def handle_tool(name: str, arguments: dict) -> list[TextContent | ImageCon
                 {"target": r.target, "type": r.rel_type.value}
                 for r in concept.relationships
             ],
+            "sources": [s.to_dict() for s in concept.sources],
         }
         return [TextContent(type="text", text=json.dumps(data, indent=2))]
     

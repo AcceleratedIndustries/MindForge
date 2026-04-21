@@ -28,7 +28,15 @@ def render_concept(concept: Concept) -> str:
     if concept.tags:
         lines.append(f"tags: [{', '.join(concept.tags)}]")
     lines.append(f"confidence: {concept.confidence:.2f}")
-    if concept.source_files:
+    if concept.sources:
+        lines.append("sources:")
+        for src in concept.sources:
+            turns = ", ".join(str(i) for i in src.turn_indices)
+            lines.append(f"  - transcript: \"{src.transcript_path}\"")
+            lines.append(f"    turns: [{turns}]")
+            lines.append(f"    extracted_at: \"{src.extracted_at}\"")
+    elif concept.source_files:
+        # Legacy fallback when Concept.sources is empty.
         lines.append("sources:")
         for src in concept.source_files:
             lines.append(f"  - \"{src}\"")

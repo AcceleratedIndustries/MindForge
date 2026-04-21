@@ -171,10 +171,24 @@ class ConceptStore:
 
     @classmethod
     def load(cls, path: Path) -> ConceptStore:
-        """Load concepts from a JSON manifest."""
+        """Load concepts from a JSON manifest.
+
+        Emits a one-time stderr warning when any concept lacks provenance
+        (legacy KBs predate the SourceRef feature). Non-fatal.
+        """
         store = cls()
         if path.exists():
             data = json.loads(path.read_text())
+            missing = 0
             for slug, cdata in data.items():
                 store.concepts[slug] = Concept.from_dict(cdata)
+                if not cdata.get("sources"):
+                    missing += 1
+            if missing:
+                import sys
+                print(
+                    f"[mindforge] warning: {missing} concept(s) have no provenance. "
+                    "Re-ingest to populate sources.",
+                    file=sys.stderr,
+                )
         return store
