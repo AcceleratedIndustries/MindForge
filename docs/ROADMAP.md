@@ -13,7 +13,7 @@ Each phase is ordered by dependency: later phases assume earlier ones are in pla
 | Core ingestion pipeline | Shipped |
 | MCP server | Shipped |
 | LLM-assisted extraction | Shipped |
-| **Incremental ingestion (content hashing)** | **Shipped** (Hermes, `dade9ab`) |
+| **Incremental ingestion (content hashing)** | **Shipped** (ref commit `dade9ab`) |
 
 ---
 
