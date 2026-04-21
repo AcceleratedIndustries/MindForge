@@ -26,9 +26,15 @@ from mcp.types import (
 from mindforge.config import MindForgeConfig
 from mindforge.distillation.concept import ConceptStore
 from mindforge.graph.builder import KnowledgeGraph
+from mindforge.mcp.adapter import get_adapter
 from mindforge.paths import MindForgePaths
 from mindforge.query.engine import QueryEngine
 from mindforge.utils.text import slugify
+
+
+# Client adapter: resolved once per process. DefaultAdapter is pass-through;
+# future per-client quirks plug in via MINDFORGE_MCP_ADAPTER or register_adapter().
+_ADAPTER = get_adapter()
 
 
 # Base paths — resolved from MINDFORGE_ROOT or the default ~/.mindforge.
