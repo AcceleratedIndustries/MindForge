@@ -1,9 +1,29 @@
-Business Source License 1.1
+Business Source License (BSL) 1.1
 
-Copyright (C) Accelerated Industries, Inc
+Version 1.1, Change Date: April 21, 2028
 
-The use of this software is governed by the Business Source License included in the LICENSE file. This change applies effective immediately.
+This Business Source License ("License") is a business source license. You may use the Software only under the terms of this License. To the extent permitted by law, the Software is provided "as-is" without warranty of any kind, express or implied, including but not limited to any implied warranties of merchantability, fitness for a particular purpose, or non-infringement.
 
-Change Date: April 21, 2028
+1. Definitions
+   - "Change Date" means the date the Software transitions to the Apache License 2.0.
+   - "Software" means the software provided under this License.
+   - "Licensor" means the individual or entity that offers the Software under this License.
 
-On the Change Date, specified above, in accordance with the Business Source License, the use of this software Transition license Apache 20 
+2. Grant of Copyright License
+   Subject to the terms and conditions of this License, Licensor hereby grants you a worldwide, royalty-free, non-exclusive license to use, reproduce, modify, distribute, and publicly display the Software.
+
+3. Limits on Grant
+   You may not use the Software for commercial purposes until the Change Date.
+
+4. Transition
+   The Software will transition to the Apache License 2.0 on the Change Date.
+
+5. Disclaimer
+   The Software is provided "as-is." Licensor disclaims any responsibility for the consequences of its use.
+
+6. Governing Law
+   This License shall be governed by the laws of the jurisdiction in which Licensor is located.
+
+
+
+For more detail about the full Business Source License, please visit: https://businesssource.license
