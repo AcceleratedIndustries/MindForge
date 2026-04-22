@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import importlib
 import json
-from pathlib import Path
 
 import pytest
 
@@ -19,6 +18,7 @@ def mcp_root(monkeypatch, tmp_path):
     monkeypatch.setenv("MINDFORGE_ROOT", str(tmp_path))
     # Reload so module-level MINDFORGE_ROOT / KBS_DIR re-resolve.
     import mindforge.mcp.server as server
+
     importlib.reload(server)
     return server
 

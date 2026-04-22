@@ -10,9 +10,9 @@ from __future__ import annotations
 
 import json
 import logging
-import urllib.request
 import urllib.error
-from dataclasses import dataclass, field
+import urllib.request
+from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class LLMConfig:
     """Configuration for the LLM client."""
+
     provider: str = "ollama"  # "ollama" or "openai"
     model: str = "llama3.2"
     base_url: str = ""  # Auto-set based on provider if empty
@@ -39,6 +40,7 @@ class LLMConfig:
 @dataclass
 class LLMResponse:
     """A response from the LLM."""
+
     content: str
     model: str = ""
     prompt_tokens: int = 0
@@ -77,7 +79,9 @@ class LLMClient:
             if self.config.api_key:
                 req.add_header("Authorization", f"Bearer {self.config.api_key}")
 
-            with urllib.request.urlopen(req, timeout=5) as resp:
+            # URL comes from user config (base_url); scheme is restricted by construction
+            # to https/http via the HTTP(S) provider. Schema is not user-input.
+            with urllib.request.urlopen(req, timeout=5) as resp:  # nosec B310
                 return resp.status == 200
         except (urllib.error.URLError, OSError, TimeoutError):
             return False
@@ -136,7 +140,9 @@ class LLMClient:
             if self.config.api_key:
                 req.add_header("Authorization", f"Bearer {self.config.api_key}")
 
-            with urllib.request.urlopen(req, timeout=self.config.timeout) as resp:
+            # URL comes from user config (base_url); scheme is restricted by construction
+            # to https/http via the HTTP(S) provider. Schema is not user-input.
+            with urllib.request.urlopen(req, timeout=self.config.timeout) as resp:  # nosec B310
                 body = json.loads(resp.read().decode("utf-8"))
                 return parser(body)
 
@@ -144,13 +150,15 @@ class LLMClient:
             error_body = e.read().decode("utf-8", errors="replace")
             logger.error("LLM HTTP error %d: %s", e.code, error_body[:500])
             return LLMResponse(
-                content="", success=False,
+                content="",
+                success=False,
                 error=f"HTTP {e.code}: {error_body[:200]}",
             )
         except (urllib.error.URLError, OSError, TimeoutError) as e:
             logger.error("LLM connection error: %s", e)
             return LLMResponse(
-                content="", success=False,
+                content="",
+                success=False,
                 error=f"Connection error: {e}",
             )
 

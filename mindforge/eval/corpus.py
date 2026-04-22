@@ -31,10 +31,13 @@ def load_corpus(fixtures_dir: Path) -> list[Fixture]:
                 file=sys.stderr,
             )
             continue
-        data = yaml.safe_load(gt.read_text(encoding="utf-8")) or {}
-        fixtures.append(Fixture(
-            transcript_path=t,
-            expected_concepts=data.get("expected_concepts", []),
-            expected_relationships=data.get("expected_relationships", []),
-        ))
+        raw = yaml.safe_load(gt.read_text(encoding="utf-8"))
+        data: dict[str, Any] = raw if isinstance(raw, dict) else {}
+        fixtures.append(
+            Fixture(
+                transcript_path=t,
+                expected_concepts=data.get("expected_concepts", []),
+                expected_relationships=data.get("expected_relationships", []),
+            )
+        )
     return fixtures

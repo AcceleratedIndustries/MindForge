@@ -15,7 +15,6 @@ from __future__ import annotations
 
 from difflib import SequenceMatcher
 
-
 DEFINITION_SIMILARITY_THRESHOLD = 0.7
 
 _QUANTIFIERS = [("always", "sometimes"), ("never", "sometimes"), ("all", "some")]
@@ -32,11 +31,8 @@ def detect_definition_conflict(a: str, b: str) -> bool:
 
 def _contradicts(a: str, b: str) -> bool:
     la, lb = a.lower(), b.lower()
-    for q1, q2 in _QUANTIFIERS:
-        if (q1 in la and q2 in lb) or (q2 in la and q1 in lb):
-            return True
-    for u1, u2 in _UNITS:
-        if (u1 in la and u2 in lb) or (u2 in la and u1 in lb):
+    for pair_set in (_QUANTIFIERS, _UNITS):
+        if any((w1 in la and w2 in lb) or (w2 in la and w1 in lb) for w1, w2 in pair_set):
             return True
     return False
 

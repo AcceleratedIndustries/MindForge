@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from pathlib import Path
 
 from mindforge.distillation.concept import Concept, ConceptStore
 from mindforge.embeddings.index import EmbeddingIndex
@@ -22,6 +21,7 @@ from mindforge.utils.text import extract_keywords
 @dataclass
 class QueryResult:
     """A single result from a knowledge base query."""
+
     concept: Concept
     score: float
     match_type: str  # "keyword", "semantic", "combined"
@@ -77,12 +77,14 @@ class QueryEngine:
             if self._graph:
                 neighbors = self._graph.neighbors(slug)
 
-            results.append(QueryResult(
-                concept=concept,
-                score=score,
-                match_type=match_type,
-                neighbors=neighbors,
-            ))
+            results.append(
+                QueryResult(
+                    concept=concept,
+                    score=score,
+                    match_type=match_type,
+                    neighbors=neighbors,
+                )
+            )
 
         return results
 

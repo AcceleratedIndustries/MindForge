@@ -10,10 +10,7 @@ from mindforge.eval.corpus import Fixture, load_corpus
 def test_load_corpus_pairs_transcripts_and_gt(tmp_path: Path):
     (tmp_path / "a.md").write_text("Assistant: stuff")
     (tmp_path / "a.gt.yaml").write_text(
-        "expected_concepts:\n"
-        "  - name: Foo\n"
-        "    slug: foo\n"
-        "    key_phrases: [stuff]\n"
+        "expected_concepts:\n  - name: Foo\n    slug: foo\n    key_phrases: [stuff]\n"
     )
     fixtures = load_corpus(tmp_path)
     assert len(fixtures) == 1

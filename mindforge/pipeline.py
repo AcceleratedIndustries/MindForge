@@ -11,13 +11,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from mindforge.config import MindForgeConfig
-from mindforge.distillation.concept import ConceptStore
+from mindforge.distillation.concept import Concept, ConceptStore
 from mindforge.distillation.deduplicator import deduplicate_concepts
-from mindforge.distillation.distiller import distill_all
 from mindforge.distillation.renderer import write_all_concepts
 from mindforge.embeddings.index import EmbeddingIndex
 from mindforge.graph.builder import KnowledgeGraph
-from mindforge.ingestion.chunker import chunk_turns
+from mindforge.ingestion.chunker import Chunk, chunk_turns
 from mindforge.ingestion.extractor import RawConcept, extract_concepts
 from mindforge.ingestion.parser import parse_all_transcripts
 from mindforge.linking.linker import detect_links
@@ -27,7 +26,7 @@ from mindforge.llm.extractor import extract_concepts_llm
 from mindforge.query.engine import QueryEngine
 
 
-def _write_all_provenance(concepts, provenance_dir: Path) -> int:
+def _write_all_provenance(concepts: list[Concept], provenance_dir: Path) -> int:
     """Write one provenance JSON per concept that has sources. Returns file count."""
     count = 0
     provenance_dir.mkdir(parents=True, exist_ok=True)
@@ -35,11 +34,17 @@ def _write_all_provenance(concepts, provenance_dir: Path) -> int:
         if not concept.sources:
             continue
         path = provenance_dir / f"{concept.slug}.json"
-        path.write_text(json.dumps({
-            "slug": concept.slug,
-            "name": concept.name,
-            "sources": [s.to_dict() for s in concept.sources],
-        }, indent=2), encoding="utf-8")
+        path.write_text(
+            json.dumps(
+                {
+                    "slug": concept.slug,
+                    "name": concept.name,
+                    "sources": [s.to_dict() for s in concept.sources],
+                },
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
         count += 1
     return count
 
@@ -47,6 +52,7 @@ def _write_all_provenance(concepts, provenance_dir: Path) -> int:
 @dataclass
 class PipelineResult:
     """Result of a pipeline run."""
+
     concepts_extracted: int
     concepts_after_dedup: int
     concept_files_written: int
@@ -63,7 +69,8 @@ class PipelineResult:
             f"  After deduplication:     {self.concepts_after_dedup}",
             f"  Markdown files written:  {self.concept_files_written}",
             f"  Graph edges:             {self.edges_in_graph}",
-            f"  Embeddings built:        {'yes' if self.embeddings_built else 'no (optional deps not installed)'}",
+            f"  Embeddings built:        "
+            f"{'yes' if self.embeddings_built else 'no (optional deps not installed)'}",
         ]
         return "\n".join(lines)
 
@@ -132,6 +139,7 @@ class MindForgePipeline:
 
         # Stamp last_reinforced_at for hygiene bookkeeping.
         from datetime import datetime, timezone
+
         now_iso = datetime.now(timezone.utc).isoformat()
         for concept in self.store.all():
             concept.last_reinforced_at = now_iso
@@ -175,7 +183,9 @@ class MindForgePipeline:
 
         # Initialize query engine
         self.query_engine = QueryEngine(
-            self.store, self.graph, self.embedding_index,
+            self.store,
+            self.graph,
+            self.embedding_index,
         )
 
         # Save updated manifest (now with links)
@@ -203,7 +213,7 @@ class MindForgePipeline:
 
     def _extract_with_llm(
         self,
-        chunks: list,
+        chunks: list[Chunk],
     ) -> tuple[list[RawConcept], str]:
         """Attempt LLM extraction, falling back to heuristic if unavailable.
 
@@ -231,8 +241,10 @@ class MindForgePipeline:
         # Also run heuristic extraction and merge (LLM may miss things
         # that pattern matching catches, and vice versa)
         heuristic_concepts = extract_concepts(chunks)
-        print(f"  LLM extracted {len(llm_concepts)} concepts, "
-              f"heuristic found {len(heuristic_concepts)}")
+        print(
+            f"  LLM extracted {len(llm_concepts)} concepts, "
+            f"heuristic found {len(heuristic_concepts)}"
+        )
 
         # Merge: LLM concepts take priority, then add unique heuristic ones
         seen_names = {c.name.lower() for c in llm_concepts}

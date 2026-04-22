@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from difflib import SequenceMatcher
-
+from typing import Any
 
 FUZZY_NAME_THRESHOLD = 0.85
 
@@ -12,7 +12,9 @@ def _name_similarity(a: str, b: str) -> float:
     return SequenceMatcher(None, a.lower(), b.lower()).ratio()
 
 
-def _match_concept(expected: dict, actuals: list[dict]) -> dict | None:
+def _match_concept(
+    expected: dict[str, Any], actuals: list[dict[str, Any]]
+) -> dict[str, Any] | None:
     """Match by slug first, then fuzzy-name at FUZZY_NAME_THRESHOLD."""
     for a in actuals:
         if a.get("slug") == expected.get("slug"):
@@ -23,14 +25,14 @@ def _match_concept(expected: dict, actuals: list[dict]) -> dict | None:
     return None
 
 
-def _phrase_found(phrase: str, concept: dict) -> bool:
+def _phrase_found(phrase: str, concept: dict[str, Any]) -> bool:
     blobs = [concept.get("definition", ""), concept.get("explanation", "")]
     blobs.extend(concept.get("insights", []))
     blob = " ".join(blobs).lower()
     return phrase.lower() in blob
 
 
-def score_concepts(expected: list[dict], actual: list[dict]) -> dict:
+def score_concepts(expected: list[dict[str, Any]], actual: list[dict[str, Any]]) -> dict[str, Any]:
     """Compute recall, precision, and phrase grounding."""
     if not expected:
         return {
@@ -41,7 +43,7 @@ def score_concepts(expected: list[dict], actual: list[dict]) -> dict:
             "expected": 0,
             "extracted": len(actual),
         }
-    matched_pairs: list[tuple[dict, dict]] = []
+    matched_pairs: list[tuple[dict[str, Any], dict[str, Any]]] = []
     for e in expected:
         m = _match_concept(e, actual)
         if m is not None:
@@ -51,10 +53,7 @@ def score_concepts(expected: list[dict], actual: list[dict]) -> dict:
     phrases = [p for e, _ in matched_pairs for p in e.get("key_phrases", [])]
     if phrases:
         grounded = [
-            p
-            for e, m in matched_pairs
-            for p in e.get("key_phrases", [])
-            if _phrase_found(p, m)
+            p for e, m in matched_pairs for p in e.get("key_phrases", []) if _phrase_found(p, m)
         ]
         phrase_grounding = len(grounded) / len(phrases)
     else:
@@ -69,7 +68,9 @@ def score_concepts(expected: list[dict], actual: list[dict]) -> dict:
     }
 
 
-def score_relationships(expected: list[dict], actual: list[dict]) -> dict:
+def score_relationships(
+    expected: list[dict[str, Any]], actual: list[dict[str, Any]]
+) -> dict[str, Any]:
     """Compute relationship recall and type accuracy."""
     if not expected:
         return {
@@ -80,7 +81,7 @@ def score_relationships(expected: list[dict], actual: list[dict]) -> dict:
             "found": len(actual),
         }
 
-    def _same_edge(e: dict, a: dict) -> bool:
+    def _same_edge(e: dict[str, Any], a: dict[str, Any]) -> bool:
         return e.get("source") == a.get("source") and e.get("target") == a.get("target")
 
     matched = 0

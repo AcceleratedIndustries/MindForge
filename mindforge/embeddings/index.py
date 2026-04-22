@@ -13,15 +13,16 @@ from typing import TYPE_CHECKING
 from mindforge.distillation.concept import Concept
 
 if TYPE_CHECKING:
-    import numpy as np
+    pass
 
 
 def _check_deps() -> bool:
     """Check if embedding dependencies are available."""
     try:
-        import sentence_transformers  # noqa: F401
         import faiss  # noqa: F401
         import numpy  # noqa: F401
+        import sentence_transformers  # noqa: F401
+
         return True
     except ImportError:
         return False
@@ -49,6 +50,7 @@ class EmbeddingIndex:
     def _ensure_model(self) -> None:
         if self._model is None:
             from sentence_transformers import SentenceTransformer
+
             self._model = SentenceTransformer(self._model_name)
 
     def _concept_text(self, concept: Concept) -> str:
@@ -69,6 +71,8 @@ class EmbeddingIndex:
         import numpy as np
 
         self._ensure_model()
+        if self._model is None:
+            raise RuntimeError("Embedding model failed to load.")
 
         texts = [self._concept_text(c) for c in concepts]
         self._slugs = [c.slug for c in concepts]
@@ -109,7 +113,7 @@ class EmbeddingIndex:
         scores, indices = self._index.search(query_embedding, k)
 
         results = []
-        for score, idx in zip(scores[0], indices[0]):
+        for score, idx in zip(scores[0], indices[0], strict=False):
             if idx < len(self._slugs):
                 results.append((self._slugs[idx], float(score)))
         return results
@@ -120,7 +124,6 @@ class EmbeddingIndex:
             return
 
         import faiss
-        import numpy as np
 
         directory.mkdir(parents=True, exist_ok=True)
         faiss.write_index(self._index, str(directory / "concepts.faiss"))

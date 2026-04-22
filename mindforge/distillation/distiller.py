@@ -9,7 +9,6 @@ from __future__ import annotations
 import re
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
 
 from mindforge.distillation.concept import Concept
 from mindforge.distillation.source_ref import SourceRef
@@ -46,20 +45,22 @@ def _build_source_refs(
             h = ""
         turn_indices = sorted({c.turn_index for c in chunks})
         snippet = chunks[0].content if chunks else None
-        refs.append(SourceRef(
-            transcript_path=source_file,
-            transcript_hash=h,
-            turn_indices=turn_indices,
-            extracted_at=now,
-            chunk_id=chunks[0].id if chunks else None,
-            snippet=snippet,
-        ))
+        refs.append(
+            SourceRef(
+                transcript_path=source_file,
+                transcript_hash=h,
+                turn_indices=turn_indices,
+                extracted_at=now,
+                chunk_id=chunks[0].id if chunks else None,
+                snippet=snippet,
+            )
+        )
     return refs
 
 
 def distill_concept(
     raw: RawConcept,
-    chunk_map: Optional[dict[str, Chunk]] = None,
+    chunk_map: dict[str, Chunk] | None = None,
 ) -> Concept:
     """Distill a raw concept into a clean, structured Concept.
 
@@ -113,7 +114,8 @@ def _clean_content(text: str) -> str:
     """Remove conversational artifacts from extracted text."""
     # Remove references to "the conversation", "I mentioned", "as we discussed"
     fluff_patterns = [
-        r"(?i)\b(?:as (?:I|we) (?:mentioned|discussed|said|noted))(?:\s+(?:earlier|before|above))?\b[,.]?\s*",
+        r"(?i)\b(?:as (?:I|we) (?:mentioned|discussed|said|noted))"
+        r"(?:\s+(?:earlier|before|above))?\b[,.]?\s*",
         r"(?i)\b(?:in (?:our|the|this) (?:conversation|discussion|chat))\b[,.]?\s*",
         r"(?i)\b(?:let me explain|I(?:'ll| will) explain|here's (?:the|an?) explanation)\b[,.]?\s*",
         r"(?i)\b(?:great question|good question|that's a good point)\b[!,.]?\s*",
@@ -140,21 +142,23 @@ def _build_definition(name: str, sentences: list[str], raw: str) -> str:
     for sentence in sentences:
         s_lower = sentence.lower()
         # Look for definitional patterns
-        if any(
-            p in s_lower
-            for p in [
-                f"{name_lower} is",
-                f"{name_lower} are",
-                f"{name_lower} refers",
-                f"{name_lower} means",
-                f"{name_lower} describes",
-                f"{name_lower} represents",
-                f"{name_lower} provides",
-                f"{name_lower} enables",
-            ]
+        if (
+            any(
+                p in s_lower
+                for p in [
+                    f"{name_lower} is",
+                    f"{name_lower} are",
+                    f"{name_lower} refers",
+                    f"{name_lower} means",
+                    f"{name_lower} describes",
+                    f"{name_lower} represents",
+                    f"{name_lower} provides",
+                    f"{name_lower} enables",
+                ]
+            )
+            or name_lower in s_lower
+            and len(defining_sentences) < 3
         ):
-            defining_sentences.append(sentence)
-        elif name_lower in s_lower and len(defining_sentences) < 3:
             defining_sentences.append(sentence)
 
     if defining_sentences:
@@ -225,9 +229,20 @@ def _extract_insights(text: str, definition: str = "") -> list[str]:
 
     # Extract sentences with key phrases
     key_phrases = [
-        "important", "key", "critical", "essential", "note that",
-        "remember", "crucial", "significant", "advantage", "benefit",
-        "drawback", "limitation", "trade-off", "tradeoff",
+        "important",
+        "key",
+        "critical",
+        "essential",
+        "note that",
+        "remember",
+        "crucial",
+        "significant",
+        "advantage",
+        "benefit",
+        "drawback",
+        "limitation",
+        "trade-off",
+        "tradeoff",
     ]
     for sentence in extract_sentences(text):
         s_lower = sentence.lower()
@@ -266,7 +281,7 @@ def _extract_examples(text: str) -> list[str]:
 
 def distill_all(
     raws: list[RawConcept],
-    chunk_map: Optional[dict[str, Chunk]] = None,
+    chunk_map: dict[str, Chunk] | None = None,
 ) -> list[Concept]:
     """Distill all raw concepts into clean Concepts."""
     return [distill_concept(raw, chunk_map) for raw in raws]

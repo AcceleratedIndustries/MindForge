@@ -1,7 +1,5 @@
 """Tests for concept distillation, deduplication, and rendering."""
 
-from pathlib import Path
-
 from mindforge.distillation.concept import Concept, ConceptStore, Relationship, RelationshipType
 from mindforge.distillation.deduplicator import deduplicate_concepts
 from mindforge.distillation.distiller import distill_concept
@@ -96,16 +94,26 @@ class TestDeduplicator:
 
     def test_similar_content_dedup(self):
         raws = [
-            RawConcept(name="Embedding", raw_content="Dense numerical representations of text data in vector space"),
-            RawConcept(name="Embeddings", raw_content="Dense numerical representations of text data in a vector space"),
+            RawConcept(
+                name="Embedding",
+                raw_content="Dense numerical representations of text data in vector space",
+            ),
+            RawConcept(
+                name="Embeddings",
+                raw_content="Dense numerical representations of text data in a vector space",
+            ),
         ]
         result = deduplicate_concepts(raws, similarity_threshold=0.6)
         assert len(result) == 1
 
     def test_different_concepts_kept(self):
         raws = [
-            RawConcept(name="Vector Database", raw_content="Stores and queries high-dimensional vectors"),
-            RawConcept(name="KV Cache", raw_content="Caches key-value pairs during transformer inference"),
+            RawConcept(
+                name="Vector Database", raw_content="Stores and queries high-dimensional vectors"
+            ),
+            RawConcept(
+                name="KV Cache", raw_content="Caches key-value pairs during transformer inference"
+            ),
         ]
         result = deduplicate_concepts(raws)
         assert len(result) == 2

@@ -18,6 +18,7 @@ from mindforge.ingestion.parser import ConversationTurn
 @dataclass
 class Chunk:
     """A semantically coherent piece of text from a transcript."""
+
     content: str
     source_file: str
     turn_index: int
@@ -62,7 +63,7 @@ def _split_code_blocks(text: str) -> list[str]:
     pattern = re.compile(r"(```[\s\S]*?```)", re.MULTILINE)
     last_end = 0
     for match in pattern.finditer(text):
-        before = text[last_end:match.start()].strip()
+        before = text[last_end : match.start()].strip()
         if before:
             parts.append(before)
         parts.append(match.group(0))
@@ -143,13 +144,15 @@ def chunk_turn(turn: ConversationTurn) -> list[Chunk]:
     # Build typed Chunk objects
     chunks = []
     for i, content in enumerate(raw_chunks):
-        chunks.append(Chunk(
-            content=content,
-            source_file=turn.source_file,
-            turn_index=turn.index,
-            chunk_index=i,
-            chunk_type=_classify_block(content),
-        ))
+        chunks.append(
+            Chunk(
+                content=content,
+                source_file=turn.source_file,
+                turn_index=turn.index,
+                chunk_index=i,
+                chunk_type=_classify_block(content),
+            )
+        )
 
     return chunks
 

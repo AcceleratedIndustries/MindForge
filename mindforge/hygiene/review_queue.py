@@ -36,10 +36,12 @@ def build_review_queue(
         )
         age = age_days(c.last_reinforced_at)
         if is_stale(adj, age):
-            queue.append({
-                "slug": c.slug,
-                "name": c.name,
-                "reason": "stale",
-                "adjusted": adj,
-            })
+            queue.append(
+                {
+                    "slug": c.slug,
+                    "name": c.name,
+                    "reason": "stale",
+                    "adjusted": adj,
+                }
+            )
     return queue

@@ -10,15 +10,17 @@ from pathlib import Path
 @dataclass
 class ConversationTurn:
     """A single turn in a conversation."""
-    role: str        # "human" | "assistant" | "system" | "unknown"
+
+    role: str  # "human" | "assistant" | "system" | "unknown"
     content: str
-    index: int       # position in the conversation
+    index: int  # position in the conversation
     source_file: str
 
 
 @dataclass
 class Transcript:
     """A parsed conversation transcript."""
+
     source_file: str
     turns: list[ConversationTurn]
 
@@ -50,7 +52,7 @@ def _detect_role(line: str) -> tuple[str, str] | None:
         match = pattern.match(stripped)
         if match:
             # Extract content after the role marker
-            remaining = stripped[match.end():].strip().lstrip(":").strip()
+            remaining = stripped[match.end() :].strip().lstrip(":").strip()
             return role, remaining
     return None
 
@@ -76,12 +78,14 @@ def parse_transcript(path: Path) -> Transcript:
         if current_role and current_lines:
             content = "\n".join(current_lines).strip()
             if content:
-                turns.append(ConversationTurn(
-                    role=current_role,
-                    content=content,
-                    index=len(turns),
-                    source_file=source,
-                ))
+                turns.append(
+                    ConversationTurn(
+                        role=current_role,
+                        content=content,
+                        index=len(turns),
+                        source_file=source,
+                    )
+                )
         current_lines = []
 
     for line in lines:
@@ -107,12 +111,14 @@ def parse_transcript(path: Path) -> Transcript:
     # If no roles detected, treat entire file as a single assistant turn
     # (common for knowledge dump files)
     if not turns:
-        turns.append(ConversationTurn(
-            role="assistant",
-            content=text.strip(),
-            index=0,
-            source_file=source,
-        ))
+        turns.append(
+            ConversationTurn(
+                role="assistant",
+                content=text.strip(),
+                index=0,
+                source_file=source,
+            )
+        )
 
     return Transcript(source_file=source, turns=turns)
 

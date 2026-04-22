@@ -10,19 +10,41 @@ from __future__ import annotations
 
 import re
 
-from mindforge.distillation.concept import Concept, ConceptStore, Relationship, RelationshipType
+from mindforge.distillation.concept import ConceptStore, Relationship, RelationshipType
 from mindforge.utils.text import compute_text_similarity
-
 
 # Patterns for detecting typed relationships in text
 _RELATIONSHIP_PATTERNS: list[tuple[re.Pattern[str], RelationshipType]] = [
-    (re.compile(r"\buses\b|\butilizes\b|\bleverages\b|\bemploys\b", re.IGNORECASE), RelationshipType.USES),
-    (re.compile(r"\bimproves\b|\benhances\b|\boptimizes\b|\bextends\b", re.IGNORECASE), RelationshipType.IMPROVES),
-    (re.compile(r"\bdepends on\b|\brequires\b|\bneeds\b|\brelies on\b", re.IGNORECASE), RelationshipType.DEPENDS_ON),
-    (re.compile(r"\bpart of\b|\bcomponent of\b|\bsubset of\b|\bbelongs to\b", re.IGNORECASE), RelationshipType.PART_OF),
-    (re.compile(r"\bexample of\b|\binstance of\b|\btype of\b|\bkind of\b", re.IGNORECASE), RelationshipType.EXAMPLE_OF),
-    (re.compile(r"\bcontrasts with\b|\bunlike\b|\bversus\b|\bvs\.?\b|\bcompared to\b", re.IGNORECASE), RelationshipType.CONTRASTS_WITH),
-    (re.compile(r"\benables\b|\ballows\b|\bmakes possible\b|\bfacilitates\b", re.IGNORECASE), RelationshipType.ENABLES),
+    (
+        re.compile(r"\buses\b|\butilizes\b|\bleverages\b|\bemploys\b", re.IGNORECASE),
+        RelationshipType.USES,
+    ),
+    (
+        re.compile(r"\bimproves\b|\benhances\b|\boptimizes\b|\bextends\b", re.IGNORECASE),
+        RelationshipType.IMPROVES,
+    ),
+    (
+        re.compile(r"\bdepends on\b|\brequires\b|\bneeds\b|\brelies on\b", re.IGNORECASE),
+        RelationshipType.DEPENDS_ON,
+    ),
+    (
+        re.compile(r"\bpart of\b|\bcomponent of\b|\bsubset of\b|\bbelongs to\b", re.IGNORECASE),
+        RelationshipType.PART_OF,
+    ),
+    (
+        re.compile(r"\bexample of\b|\binstance of\b|\btype of\b|\bkind of\b", re.IGNORECASE),
+        RelationshipType.EXAMPLE_OF,
+    ),
+    (
+        re.compile(
+            r"\bcontrasts with\b|\bunlike\b|\bversus\b|\bvs\.?\b|\bcompared to\b", re.IGNORECASE
+        ),
+        RelationshipType.CONTRASTS_WITH,
+    ),
+    (
+        re.compile(r"\benables\b|\ballows\b|\bmakes possible\b|\bfacilitates\b", re.IGNORECASE),
+        RelationshipType.ENABLES,
+    ),
 ]
 
 
@@ -43,7 +65,6 @@ def _detect_relationship_type(
     """
     # Look for patterns in sentences that mention both concepts
     sentences = re.split(r"[.!?]\s+", text)
-    source_lower = source_name.lower()
     target_lower = target_name.lower()
 
     for sentence in sentences:
@@ -67,7 +88,6 @@ def detect_links(
     - typed relationships (concept.relationships)
     """
     all_concepts = store.all()
-    all_slugs = store.slugs()
 
     for concept in all_concepts:
         combined_text = f"{concept.definition} {concept.explanation}"
@@ -86,10 +106,13 @@ def detect_links(
             tag_score = len(shared_tags) / max(len(concept.tags), 1) * 0.5
 
             # Signal 3: Content similarity
-            content_score = compute_text_similarity(
-                concept.definition[:200],
-                other.definition[:200],
-            ) * 0.4
+            content_score = (
+                compute_text_similarity(
+                    concept.definition[:200],
+                    other.definition[:200],
+                )
+                * 0.4
+            )
 
             total_score = name_score + tag_score + content_score
 
@@ -98,16 +121,20 @@ def detect_links(
 
                 # Detect relationship type
                 rel_type = _detect_relationship_type(
-                    combined_text, concept.name, other.name,
+                    combined_text,
+                    concept.name,
+                    other.name,
                 )
 
                 concept.links.append(other.name)
-                concept.relationships.append(Relationship(
-                    source=concept.slug,
-                    target=other.slug,
-                    rel_type=rel_type,
-                    confidence=min(total_score, 1.0),
-                ))
+                concept.relationships.append(
+                    Relationship(
+                        source=concept.slug,
+                        target=other.slug,
+                        rel_type=rel_type,
+                        confidence=min(total_score, 1.0),
+                    )
+                )
 
         # Deduplicate links
         concept.links = list(dict.fromkeys(concept.links))
@@ -129,5 +156,5 @@ def insert_wiki_links(text: str, concept_names: list[str]) -> str:
             rf"(?<!\[\[)\b({re.escape(name)})\b(?!\]\])",
             re.IGNORECASE,
         )
-        result = pattern.sub(rf"[[\1]]", result, count=1)
+        result = pattern.sub(r"[[\1]]", result, count=1)
     return result

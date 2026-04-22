@@ -1,7 +1,5 @@
 """Tests for the knowledge graph builder."""
 
-from pathlib import Path
-
 from mindforge.distillation.concept import Concept, ConceptStore, Relationship, RelationshipType
 from mindforge.graph.builder import KnowledgeGraph
 

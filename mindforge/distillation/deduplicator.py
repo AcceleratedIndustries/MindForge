@@ -34,7 +34,7 @@ def deduplicate_concepts(
 
     # Merge within slug groups
     merged: list[RawConcept] = []
-    for slug, group in slug_groups.items():
+    for _slug, group in slug_groups.items():
         primary = max(group, key=lambda c: (c.confidence, len(c.raw_content)))
         for other in group:
             if other is not primary:
@@ -79,7 +79,8 @@ def _merge_raw(primary: RawConcept, secondary: RawConcept) -> RawConcept:
         p.strip().lower() for p in primary.raw_content.split("\n\n") if p.strip()
     )
     new_paragraphs = [
-        p.strip() for p in secondary.raw_content.split("\n\n")
+        p.strip()
+        for p in secondary.raw_content.split("\n\n")
         if p.strip() and p.strip().lower() not in primary_paragraphs
     ]
     if new_paragraphs:
@@ -90,12 +91,8 @@ def _merge_raw(primary: RawConcept, secondary: RawConcept) -> RawConcept:
     return RawConcept(
         name=primary.name,
         raw_content=combined[:5000],  # Cap total length
-        source_chunks=list(dict.fromkeys(
-            primary.source_chunks + secondary.source_chunks
-        )),
-        source_files=list(dict.fromkeys(
-            primary.source_files + secondary.source_files
-        )),
+        source_chunks=list(dict.fromkeys(primary.source_chunks + secondary.source_chunks)),
+        source_files=list(dict.fromkeys(primary.source_files + secondary.source_files)),
         extraction_method=primary.extraction_method,
         confidence=max(primary.confidence, secondary.confidence),
     )

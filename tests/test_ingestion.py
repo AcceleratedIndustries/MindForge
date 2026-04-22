@@ -1,11 +1,8 @@
 """Tests for the ingestion pipeline: parser, chunker, extractor."""
 
-import textwrap
-from pathlib import Path
-
-from mindforge.ingestion.parser import parse_transcript, ConversationTurn, Transcript
-from mindforge.ingestion.chunker import chunk_turn, Chunk
-from mindforge.ingestion.extractor import extract_concepts, _is_valid_concept_name
+from mindforge.ingestion.chunker import Chunk, chunk_turn
+from mindforge.ingestion.extractor import _is_valid_concept_name, extract_concepts
+from mindforge.ingestion.parser import ConversationTurn, Transcript, parse_transcript
 
 
 class TestParser:
@@ -26,8 +23,7 @@ class TestParser:
     def test_parse_heading_style(self, tmp_path):
         transcript_file = tmp_path / "test.md"
         transcript_file.write_text(
-            "## Human\nWhat is AI?\n\n"
-            "## Assistant\nAI is artificial intelligence.\n"
+            "## Human\nWhat is AI?\n\n## Assistant\nAI is artificial intelligence.\n"
         )
         result = parse_transcript(transcript_file)
         assert len(result.turns) == 2
@@ -42,8 +38,7 @@ class TestParser:
     def test_assistant_turns(self, tmp_path):
         transcript_file = tmp_path / "test.md"
         transcript_file.write_text(
-            "Human: Question\n\nAssistant: Answer\n\n"
-            "Human: Another\n\nAssistant: Response\n"
+            "Human: Question\n\nAssistant: Answer\n\nHuman: Another\n\nAssistant: Response\n"
         )
         result = parse_transcript(transcript_file)
         assert len(result.assistant_turns) == 2
@@ -51,8 +46,7 @@ class TestParser:
     def test_separator_based(self, tmp_path):
         transcript_file = tmp_path / "test.md"
         transcript_file.write_text(
-            "Human: First question\n\n---\n\n"
-            "This is the assistant response.\n"
+            "Human: First question\n\n---\n\nThis is the assistant response.\n"
         )
         result = parse_transcript(transcript_file)
         assert len(result.turns) >= 2
@@ -135,7 +129,9 @@ class TestConceptNameValidation:
         assert not _is_valid_concept_name("Without KV Cache generation")
 
     def test_too_long(self):
-        assert not _is_valid_concept_name("This is a very long name that should not be a concept at all")
+        assert not _is_valid_concept_name(
+            "This is a very long name that should not be a concept at all"
+        )
 
 
 class TestExtractor:

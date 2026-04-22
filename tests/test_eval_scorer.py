@@ -33,11 +33,14 @@ def test_concept_missing_drops_recall():
 
 def test_phrase_grounding():
     expected = [{"slug": "x", "name": "X", "key_phrases": ["foo bar", "baz"]}]
-    actual = [{
-        "slug": "x", "name": "X",
-        "definition": "This concerns foo bar.",
-        "insights": ["baz happens"],
-    }]
+    actual = [
+        {
+            "slug": "x",
+            "name": "X",
+            "definition": "This concerns foo bar.",
+            "insights": ["baz happens"],
+        }
+    ]
     r = score_concepts(expected, actual)
     assert r["phrase_grounding"] == 1.0
 

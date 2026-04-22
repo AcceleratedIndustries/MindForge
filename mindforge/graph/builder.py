@@ -11,6 +11,7 @@ from pathlib import Path
 
 try:
     import networkx as nx
+
     HAS_NETWORKX = True
 except ImportError:
     HAS_NETWORKX = False
@@ -30,7 +31,7 @@ class KnowledgeGraph:
         self._edges: list[dict] = []
 
         if HAS_NETWORKX:
-            self._graph: nx.DiGraph = nx.DiGraph()
+            self._graph: nx.DiGraph | None = nx.DiGraph()
         else:
             self._graph = None
 
@@ -106,8 +107,10 @@ class KnowledgeGraph:
             graph._edges.append(edge)
             if graph._graph is not None:
                 graph._graph.add_edge(
-                    edge["source"], edge["target"],
-                    type=edge["type"], confidence=edge.get("confidence", 1.0),
+                    edge["source"],
+                    edge["target"],
+                    type=edge["type"],
+                    confidence=edge.get("confidence", 1.0),
                 )
         return graph
 

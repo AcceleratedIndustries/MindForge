@@ -1,12 +1,12 @@
 """Tests for mindforge.utils.text."""
 
 from mindforge.utils.text import (
-    slugify,
-    content_hash,
-    normalize_whitespace,
-    extract_sentences,
-    extract_keywords,
     compute_text_similarity,
+    content_hash,
+    extract_keywords,
+    extract_sentences,
+    normalize_whitespace,
+    slugify,
 )
 
 

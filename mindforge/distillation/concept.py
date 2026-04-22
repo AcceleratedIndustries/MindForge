@@ -6,19 +6,21 @@ import json
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
+from typing import Any
 
 from mindforge.distillation.source_ref import SourceRef
-from mindforge.utils.text import slugify, content_hash
 
 # Late import to avoid a cycle: markers imports SourceRef (fine), and
 # concept.py would import markers (also fine), but tests sometimes load
 # partial modules. Importing here at module scope is safe because markers
 # itself has no concept.py dependency.
 from mindforge.hygiene.markers import ConflictMarker  # noqa: E402
+from mindforge.utils.text import content_hash, slugify
 
 
 class RelationshipType(str, Enum):
     """Types of relationships between concepts."""
+
     USES = "uses"
     IMPROVES = "improves"
     DEPENDS_ON = "depends_on"
@@ -32,12 +34,13 @@ class RelationshipType(str, Enum):
 @dataclass
 class Relationship:
     """A directed relationship between two concepts."""
+
     source: str  # concept slug
     target: str  # concept slug
     rel_type: RelationshipType
     confidence: float = 1.0
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "source": self.source,
             "target": self.target,
@@ -46,7 +49,7 @@ class Relationship:
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> Relationship:
+    def from_dict(cls, data: dict[str, Any]) -> Relationship:
         return cls(
             source=data["source"],
             target=data["target"],
@@ -58,6 +61,7 @@ class Relationship:
 @dataclass
 class Concept:
     """An atomic knowledge concept extracted from transcripts."""
+
     name: str
     definition: str  # 2-3 sentence definition
     explanation: str  # Expanded explanation
@@ -82,7 +86,7 @@ class Concept:
     def hash(self) -> str:
         return content_hash(f"{self.name}:{self.definition}")
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "slug": self.slug,
@@ -103,7 +107,7 @@ class Concept:
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> Concept:
+    def from_dict(cls, data: dict[str, Any]) -> Concept:
         rels = [Relationship.from_dict(r) for r in data.get("relationships", [])]
         sources = [SourceRef.from_dict(s) for s in data.get("sources", [])]
         conflicts = [ConflictMarker.from_dict(c) for c in data.get("conflicts", [])]
@@ -133,7 +137,7 @@ class Concept:
         merged_sources = list(dict.fromkeys(self.source_files + other.source_files))
 
         # Dedup SourceRef list by (transcript_path, transcript_hash, turn_indices).
-        seen: set[tuple] = set()
+        seen: set[tuple[str, str, tuple[int, ...]]] = set()
         merged_refs: list[SourceRef] = []
         for ref in self.sources + other.sources:
             key = (ref.transcript_path, ref.transcript_hash, tuple(ref.turn_indices))
@@ -143,8 +147,14 @@ class Concept:
             merged_refs.append(ref)
 
         # Keep the longer/better explanation
-        explanation = self.explanation if len(self.explanation) >= len(other.explanation) else other.explanation
-        definition = self.definition if len(self.definition) >= len(other.definition) else other.definition
+        explanation = (
+            self.explanation
+            if len(self.explanation) >= len(other.explanation)
+            else other.explanation
+        )
+        definition = (
+            self.definition if len(self.definition) >= len(other.definition) else other.definition
+        )
 
         return Concept(
             name=self.name,
@@ -164,6 +174,7 @@ class Concept:
 @dataclass
 class ConceptStore:
     """In-memory store for all concepts, supporting lookup and persistence."""
+
     concepts: dict[str, Concept] = field(default_factory=dict)  # slug -> Concept
 
     def add(self, concept: Concept) -> None:
@@ -205,6 +216,7 @@ class ConceptStore:
                     missing += 1
             if missing:
                 import sys
+
                 print(
                     f"[mindforge] warning: {missing} concept(s) have no provenance. "
                     "Re-ingest to populate sources.",

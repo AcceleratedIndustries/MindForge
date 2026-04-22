@@ -18,11 +18,17 @@ def _write_transcript(path: Path, text: str) -> None:
 
 def test_renderer_emits_structured_sources_in_frontmatter():
     c = Concept(
-        name="KV Cache", definition="d", explanation="e",
-        sources=[SourceRef(
-            transcript_path="t.md", transcript_hash="h",
-            turn_indices=[4, 7], extracted_at="2025-03-14T11:22:00Z",
-        )],
+        name="KV Cache",
+        definition="d",
+        explanation="e",
+        sources=[
+            SourceRef(
+                transcript_path="t.md",
+                transcript_hash="h",
+                turn_indices=[4, 7],
+                extracted_at="2025-03-14T11:22:00Z",
+            )
+        ],
     )
     md = render_concept(c)
     assert 'transcript: "t.md"' in md
@@ -32,7 +38,9 @@ def test_renderer_emits_structured_sources_in_frontmatter():
 
 def test_renderer_falls_back_to_source_files_when_no_sources():
     c = Concept(
-        name="X", definition="d", explanation="e",
+        name="X",
+        definition="d",
+        explanation="e",
         source_files=["legacy.md"],
     )
     md = render_concept(c)
