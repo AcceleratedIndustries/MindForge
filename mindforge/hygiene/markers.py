@@ -16,7 +16,7 @@ class ConflictVariant:
         return {"source": self.source.to_dict(), "text": self.text}
 
     @classmethod
-    def from_dict(cls, d: dict) -> "ConflictVariant":
+    def from_dict(cls, d: dict) -> ConflictVariant:
         return cls(source=SourceRef.from_dict(d["source"]), text=d["text"])
 
 
@@ -32,7 +32,7 @@ class ConflictMarker:
         }
 
     @classmethod
-    def from_dict(cls, d: dict) -> "ConflictMarker":
+    def from_dict(cls, d: dict) -> ConflictMarker:
         return cls(
             field=d["field"],
             variants=[ConflictVariant.from_dict(v) for v in d["variants"]],

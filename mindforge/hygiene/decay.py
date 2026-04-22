@@ -5,7 +5,6 @@ from __future__ import annotations
 import math
 from datetime import datetime, timezone
 
-
 DEFAULT_HALF_LIFE_DAYS = 62.0
 STALE_CONFIDENCE = 0.3
 STALE_AGE_DAYS = 90.0

@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
-
 
 SNIPPET_MAX_CHARS = 500
 
@@ -15,8 +13,8 @@ class SourceRef:
     transcript_hash: str
     turn_indices: list[int]
     extracted_at: str  # ISO 8601 UTC
-    chunk_id: Optional[str] = None
-    snippet: Optional[str] = None
+    chunk_id: str | None = None
+    snippet: str | None = None
 
     def __post_init__(self) -> None:
         if self.snippet is not None and len(self.snippet) > SNIPPET_MAX_CHARS:
@@ -33,7 +31,7 @@ class SourceRef:
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> "SourceRef":
+    def from_dict(cls, data: dict) -> SourceRef:
         return cls(
             transcript_path=data["transcript_path"],
             transcript_hash=data["transcript_hash"],

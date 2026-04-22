@@ -204,7 +204,7 @@ def cmd_ingest(args: argparse.Namespace) -> int:
         llm_api_key=args.llm_api_key,
     )
 
-    print(f"MindForge v0.1.0")
+    print("MindForge v0.1.0")
     print(f"Input:  {config.transcripts_dir.resolve()}")
     print(f"Output: {config.output_dir.resolve()}")
     if config.use_llm:
@@ -247,7 +247,7 @@ def cmd_stats(args: argparse.Namespace) -> int:
     store = ConceptStore.load(manifest)
     concepts = store.all()
 
-    print(f"MindForge Knowledge Base Statistics")
+    print("MindForge Knowledge Base Statistics")
     print(f"{'=' * 40}")
     print(f"  Total concepts:    {len(concepts)}")
 
@@ -268,7 +268,7 @@ def cmd_stats(args: argparse.Namespace) -> int:
         graph = KnowledgeGraph.load(graph_path)
         stats = graph.stats()
         print()
-        print(f"  Graph:")
+        print("  Graph:")
         print(f"    Nodes:     {stats['nodes']}")
         print(f"    Edges:     {stats['edges']}")
         print(f"    Clusters:  {stats['clusters']}")

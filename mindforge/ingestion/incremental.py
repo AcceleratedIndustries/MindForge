@@ -5,15 +5,14 @@ Enables efficient updates without full rebuilds.
 
 from __future__ import annotations
 
-import json
 import hashlib
-from pathlib import Path
-from dataclasses import dataclass, field
+import json
+from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Optional, Any
+from pathlib import Path
+from typing import Any
 
 from mindforge.ingestion.extractor import RawConcept
-from mindforge.ingestion.chunker import Chunk
 
 
 @dataclass
@@ -23,8 +22,8 @@ class FileStatus:
     is_new: bool = False
     is_modified: bool = False
     is_unchanged: bool = False
-    previous_hash: Optional[str] = None
-    current_hash: Optional[str] = None
+    previous_hash: str | None = None
+    current_hash: str | None = None
 
 
 @dataclass
@@ -138,7 +137,7 @@ class IncrementalIngest:
         self._hashes_cache[file_path] = hash_value
         self._save_state()
     
-    def get_hash(self, file_path: str) -> Optional[str]:
+    def get_hash(self, file_path: str) -> str | None:
         """Retrieve stored hash for a file."""
         return self._hashes_cache.get(file_path)
     
@@ -185,7 +184,7 @@ class IncrementalIngest:
         self._embeddings_cache[key] = embedding
         self._save_state()
     
-    def get_embedding(self, concept_id: str, content_hash: str) -> Optional[list[float]]:
+    def get_embedding(self, concept_id: str, content_hash: str) -> list[float] | None:
         """Retrieve cached embedding if content hash matches."""
         key = f"{concept_id}:{content_hash}"
         return self._embeddings_cache.get(key)
@@ -236,7 +235,7 @@ class IncrementalIngest:
         
         self._save_state()
     
-    def get_concept_by_name(self, name: str) -> Optional[RawConcept]:
+    def get_concept_by_name(self, name: str) -> RawConcept | None:
         """Retrieve concept metadata."""
         meta = self._concepts_meta.get(name)
         if not meta:

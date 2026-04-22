@@ -1,11 +1,9 @@
 """Tests for the ingestion pipeline: parser, chunker, extractor."""
 
-import textwrap
-from pathlib import Path
 
-from mindforge.ingestion.parser import parse_transcript, ConversationTurn, Transcript
-from mindforge.ingestion.chunker import chunk_turn, Chunk
-from mindforge.ingestion.extractor import extract_concepts, _is_valid_concept_name
+from mindforge.ingestion.chunker import Chunk, chunk_turn
+from mindforge.ingestion.extractor import _is_valid_concept_name, extract_concepts
+from mindforge.ingestion.parser import ConversationTurn, Transcript, parse_transcript
 
 
 class TestParser:

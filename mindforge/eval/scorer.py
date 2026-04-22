@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from difflib import SequenceMatcher
 
-
 FUZZY_NAME_THRESHOLD = 0.85
 
 

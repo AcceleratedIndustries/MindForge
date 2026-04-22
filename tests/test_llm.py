@@ -10,25 +10,24 @@ LLM server. They verify:
 """
 
 import json
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock
 
 from mindforge.ingestion.chunker import Chunk
 from mindforge.ingestion.extractor import RawConcept
 from mindforge.llm.client import LLMClient, LLMConfig, LLMResponse
-from mindforge.llm.extractor import (
-    _extract_json_from_response,
-    _parse_llm_concepts,
-    _batch_chunks,
-    extract_concepts_llm,
-)
 from mindforge.llm.distiller import (
+    _clean_markers,
     _extract_embedded_relationships,
     _extract_embedded_tags,
-    _clean_markers,
-    distill_llm_concept,
     distill_concept_smart,
+    distill_llm_concept,
 )
-
+from mindforge.llm.extractor import (
+    _batch_chunks,
+    _extract_json_from_response,
+    _parse_llm_concepts,
+    extract_concepts_llm,
+)
 
 # === Sample LLM responses for testing ===
 

@@ -51,7 +51,7 @@ class MindForgePaths:
     config_file: Path
 
     @classmethod
-    def resolve(cls, explicit_root: str | Path | None = None) -> "MindForgePaths":
+    def resolve(cls, explicit_root: str | Path | None = None) -> MindForgePaths:
         root = resolve_root(explicit_root)
         return cls(
             root=root,

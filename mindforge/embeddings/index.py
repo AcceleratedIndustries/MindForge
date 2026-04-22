@@ -13,15 +13,15 @@ from typing import TYPE_CHECKING
 from mindforge.distillation.concept import Concept
 
 if TYPE_CHECKING:
-    import numpy as np
+    pass
 
 
 def _check_deps() -> bool:
     """Check if embedding dependencies are available."""
     try:
-        import sentence_transformers  # noqa: F401
         import faiss  # noqa: F401
         import numpy  # noqa: F401
+        import sentence_transformers  # noqa: F401
         return True
     except ImportError:
         return False
@@ -120,7 +120,6 @@ class EmbeddingIndex:
             return
 
         import faiss
-        import numpy as np
 
         directory.mkdir(parents=True, exist_ok=True)
         faiss.write_index(self._index, str(directory / "concepts.faiss"))

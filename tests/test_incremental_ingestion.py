@@ -9,17 +9,13 @@ Key behaviors:
 
 from __future__ import annotations
 
-import json
 import hashlib
-import tempfile
-from pathlib import Path
 from datetime import datetime
 
 import pytest
 
-from mindforge.ingestion.incremental import ContentHasher, IncrementalIngest
-from mindforge.ingestion.chunker import Chunk
 from mindforge.ingestion.extractor import RawConcept
+from mindforge.ingestion.incremental import ContentHasher, IncrementalIngest
 
 
 class TestContentHasher:

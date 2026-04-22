@@ -10,17 +10,17 @@ For concepts NOT extracted by the LLM, falls back to the standard distiller.
 from __future__ import annotations
 
 import re
-from typing import Optional
 
 from mindforge.distillation.concept import Concept, Relationship, RelationshipType
 from mindforge.distillation.distiller import (
     _build_source_refs,
+)
+from mindforge.distillation.distiller import (
     distill_concept as heuristic_distill,
 )
 from mindforge.ingestion.chunker import Chunk
 from mindforge.ingestion.extractor import RawConcept
-from mindforge.utils.text import extract_keywords, extract_sentences, normalize_whitespace
-
+from mindforge.utils.text import extract_keywords, normalize_whitespace
 
 # Map LLM relationship type strings to our enum
 _REL_TYPE_MAP = {
@@ -79,7 +79,7 @@ def _clean_markers(text: str) -> str:
 
 def distill_llm_concept(
     raw: RawConcept,
-    chunk_map: Optional[dict[str, Chunk]] = None,
+    chunk_map: dict[str, Chunk] | None = None,
 ) -> Concept:
     """Distill a concept that was extracted by the LLM.
 
@@ -163,7 +163,7 @@ def distill_llm_concept(
 
 def distill_concept_smart(
     raw: RawConcept,
-    chunk_map: Optional[dict[str, Chunk]] = None,
+    chunk_map: dict[str, Chunk] | None = None,
 ) -> Concept:
     """Distill a concept using the appropriate method based on extraction source.
 
@@ -177,7 +177,7 @@ def distill_concept_smart(
 
 def distill_all_smart(
     raws: list[RawConcept],
-    chunk_map: Optional[dict[str, Chunk]] = None,
+    chunk_map: dict[str, Chunk] | None = None,
 ) -> list[Concept]:
     """Distill all raw concepts, using the appropriate distiller for each."""
     return [distill_concept_smart(raw, chunk_map) for raw in raws]

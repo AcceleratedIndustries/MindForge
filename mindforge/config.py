@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
 
 from mindforge.paths import MindForgePaths
 
@@ -38,7 +37,7 @@ class MindForgeConfig:
 
     # Multi-KB root (env/config precedence via MindForgePaths).
     # None → resolve lazily in __post_init__.
-    kb_root: Optional[Path] = None
+    kb_root: Path | None = None
 
     # Hygiene (Phase 1.3)
     decay_half_life_days: float = 62.0

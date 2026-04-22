@@ -10,9 +10,9 @@ from __future__ import annotations
 
 import json
 import logging
-import urllib.request
 import urllib.error
-from dataclasses import dataclass, field
+import urllib.request
+from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 

@@ -15,7 +15,6 @@ from __future__ import annotations
 
 from difflib import SequenceMatcher
 
-
 DEFINITION_SIMILARITY_THRESHOLD = 0.7
 
 _QUANTIFIERS = [("always", "sometimes"), ("never", "sometimes"), ("all", "some")]

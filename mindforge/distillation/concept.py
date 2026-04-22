@@ -8,13 +8,13 @@ from enum import Enum
 from pathlib import Path
 
 from mindforge.distillation.source_ref import SourceRef
-from mindforge.utils.text import slugify, content_hash
 
 # Late import to avoid a cycle: markers imports SourceRef (fine), and
 # concept.py would import markers (also fine), but tests sometimes load
 # partial modules. Importing here at module scope is safe because markers
 # itself has no concept.py dependency.
 from mindforge.hygiene.markers import ConflictMarker  # noqa: E402
+from mindforge.utils.text import content_hash, slugify
 
 
 class RelationshipType(str, Enum):

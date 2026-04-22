@@ -1,6 +1,5 @@
 """Tests for concept distillation, deduplication, and rendering."""
 
-from pathlib import Path
 
 from mindforge.distillation.concept import Concept, ConceptStore, Relationship, RelationshipType
 from mindforge.distillation.deduplicator import deduplicate_concepts

@@ -1,7 +1,7 @@
 """Text processing utilities for MindForge."""
 
-import re
 import hashlib
+import re
 from collections import Counter
 
 
@@ -56,7 +56,7 @@ def extract_keywords(text: str, top_n: int = 15) -> list[str]:
         "go", "going", "well", "back", "even", "new", "way", "look", "take",
         "people", "good", "much", "right", "still", "really", "thing",
         "don", "doesn", "didn", "won", "wouldn", "couldn", "shouldn",
-        "let", "using", "used", "example", "work", "something", "actually",
+        "let", "using", "example", "work", "something", "actually",
         "basically", "essentially", "simply", "yeah", "yes", "okay",
     }
 

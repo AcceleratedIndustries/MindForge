@@ -11,8 +11,9 @@ via register_adapter().
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
     from mindforge.ingestion.parser import Transcript
@@ -22,7 +23,7 @@ if TYPE_CHECKING:
 class SourceAdapter(Protocol):
     """A source adapter produces a Transcript from a path."""
 
-    def parse(self, path: Path) -> "Transcript": ...
+    def parse(self, path: Path) -> Transcript: ...
 
 
 # extension (lowercase, includes the dot) -> adapter factory

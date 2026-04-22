@@ -13,7 +13,6 @@ from pathlib import Path
 from mindforge.config import MindForgeConfig
 from mindforge.distillation.concept import ConceptStore
 from mindforge.distillation.deduplicator import deduplicate_concepts
-from mindforge.distillation.distiller import distill_all
 from mindforge.distillation.renderer import write_all_concepts
 from mindforge.embeddings.index import EmbeddingIndex
 from mindforge.graph.builder import KnowledgeGraph

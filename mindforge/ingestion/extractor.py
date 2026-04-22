@@ -77,7 +77,6 @@ _BLOCKED_NAMES = {
     "comparison with keyword search", "applications semantic search",
     "advanced rag patterns", "ingestion pipeline", "query pipeline",
     "indexing phase", "query phase", "cache", "documents",
-    "applications", "performance impact",
 }
 
 
@@ -182,7 +181,7 @@ def _extract_from_headings(text: str, full_text: str) -> list[RawConcept]:
         # Find content after this heading (up to next heading or end)
         escaped = re.escape(heading)
         pattern = re.compile(
-            r"#{{1,4}}\s+{}\s*\n([\s\S]*?)(?=\n#{{1,4}}\s|\Z)".format(escaped),
+            rf"#{{1,4}}\s+{escaped}\s*\n([\s\S]*?)(?=\n#{{1,4}}\s|\Z)",
             re.MULTILINE,
         )
         match = pattern.search(full_text)

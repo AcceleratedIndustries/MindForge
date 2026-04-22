@@ -10,9 +10,8 @@ from __future__ import annotations
 
 import re
 
-from mindforge.distillation.concept import Concept, ConceptStore, Relationship, RelationshipType
+from mindforge.distillation.concept import ConceptStore, Relationship, RelationshipType
 from mindforge.utils.text import compute_text_similarity
-
 
 # Patterns for detecting typed relationships in text
 _RELATIONSHIP_PATTERNS: list[tuple[re.Pattern[str], RelationshipType]] = [
@@ -129,5 +128,5 @@ def insert_wiki_links(text: str, concept_names: list[str]) -> str:
             rf"(?<!\[\[)\b({re.escape(name)})\b(?!\]\])",
             re.IGNORECASE,
         )
-        result = pattern.sub(rf"[[\1]]", result, count=1)
+        result = pattern.sub(r"[[\1]]", result, count=1)
     return result

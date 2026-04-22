@@ -11,17 +11,16 @@ import json
 import os
 import shutil
 import sys
-from pathlib import Path
 from datetime import datetime
-from typing import Optional
+from pathlib import Path
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import (
-    Tool,
-    TextContent,
-    ImageContent,
     EmbeddedResource,
+    ImageContent,
+    TextContent,
+    Tool,
 )
 
 from mindforge.config import MindForgeConfig
@@ -31,7 +30,6 @@ from mindforge.mcp.adapter import get_adapter
 from mindforge.paths import MindForgePaths
 from mindforge.query.engine import QueryEngine
 from mindforge.utils.text import slugify
-
 
 # Client adapter: resolved once per process. DefaultAdapter is pass-through;
 # future per-client quirks plug in via MINDFORGE_MCP_ADAPTER or register_adapter().
@@ -87,9 +85,9 @@ class KnowledgeBase:
         self.kb_id = kb_id
         self.path = path
         self.config = MindForgeConfig(output_dir=path)
-        self.store: Optional[ConceptStore] = None
-        self.graph: Optional[KnowledgeGraph] = None
-        self.query_engine: Optional[QueryEngine] = None
+        self.store: ConceptStore | None = None
+        self.graph: KnowledgeGraph | None = None
+        self.query_engine: QueryEngine | None = None
         self._loaded = False
     
     def load(self) -> bool:
@@ -140,8 +138,8 @@ class MultiKBManager:
     def __init__(self):
         ensure_structure()
         self.registry = load_registry()
-        self.active_kb_id: Optional[str] = None
-        self.active_kb: Optional[KnowledgeBase] = None
+        self.active_kb_id: str | None = None
+        self.active_kb: KnowledgeBase | None = None
         
         # Try to load last active from environment or session
         self.active_kb_id = os.environ.get("MINDFORGE_ACTIVE_KB")
@@ -293,7 +291,7 @@ class MultiKBManager:
         except Exception as e:
             return {"success": False, "error": str(e)}
     
-    def get_current(self) -> Optional[dict]:
+    def get_current(self) -> dict | None:
         """Get info about the current active KB."""
         if not self.active_kb_id or not self.active_kb:
             return None
@@ -320,7 +318,7 @@ class MultiKBManager:
 app = Server("mindforge")
 
 # Global multi-KB manager
-_manager: Optional[MultiKBManager] = None
+_manager: MultiKBManager | None = None
 
 def get_manager() -> MultiKBManager:
     global _manager
@@ -866,7 +864,7 @@ async def main():
 class _ServerShim:
     """Sync wrapper returned by create_server() for CLI callers."""
 
-    def __init__(self, config: Optional["MindForgeConfig"] = None) -> None:
+    def __init__(self, config: MindForgeConfig | None = None) -> None:
         self.config = config
 
     def run(self) -> None:
@@ -874,7 +872,7 @@ class _ServerShim:
         asyncio.run(main())
 
 
-def create_server(config: Optional["MindForgeConfig"] = None) -> _ServerShim:
+def create_server(config: MindForgeConfig | None = None) -> _ServerShim:
     """Return a runnable server object. ``config`` is currently unused;
     the multi-KB server reads MINDFORGE_ROOT from the environment.
     """

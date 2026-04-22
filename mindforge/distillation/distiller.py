@@ -9,7 +9,6 @@ from __future__ import annotations
 import re
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
 
 from mindforge.distillation.concept import Concept
 from mindforge.distillation.source_ref import SourceRef
@@ -59,7 +58,7 @@ def _build_source_refs(
 
 def distill_concept(
     raw: RawConcept,
-    chunk_map: Optional[dict[str, Chunk]] = None,
+    chunk_map: dict[str, Chunk] | None = None,
 ) -> Concept:
     """Distill a raw concept into a clean, structured Concept.
 
@@ -152,9 +151,7 @@ def _build_definition(name: str, sentences: list[str], raw: str) -> str:
                 f"{name_lower} provides",
                 f"{name_lower} enables",
             ]
-        ):
-            defining_sentences.append(sentence)
-        elif name_lower in s_lower and len(defining_sentences) < 3:
+        ) or name_lower in s_lower and len(defining_sentences) < 3:
             defining_sentences.append(sentence)
 
     if defining_sentences:
@@ -266,7 +263,7 @@ def _extract_examples(text: str) -> list[str]:
 
 def distill_all(
     raws: list[RawConcept],
-    chunk_map: Optional[dict[str, Chunk]] = None,
+    chunk_map: dict[str, Chunk] | None = None,
 ) -> list[Concept]:
     """Distill all raw concepts into clean Concepts."""
     return [distill_concept(raw, chunk_map) for raw in raws]
