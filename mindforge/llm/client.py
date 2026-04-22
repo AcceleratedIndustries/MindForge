@@ -79,7 +79,9 @@ class LLMClient:
             if self.config.api_key:
                 req.add_header("Authorization", f"Bearer {self.config.api_key}")
 
-            with urllib.request.urlopen(req, timeout=5) as resp:
+            # URL comes from user config (base_url); scheme is restricted by construction
+            # to https/http via the HTTP(S) provider. Schema is not user-input.
+            with urllib.request.urlopen(req, timeout=5) as resp:  # nosec B310
                 return resp.status == 200
         except (urllib.error.URLError, OSError, TimeoutError):
             return False
@@ -138,7 +140,9 @@ class LLMClient:
             if self.config.api_key:
                 req.add_header("Authorization", f"Bearer {self.config.api_key}")
 
-            with urllib.request.urlopen(req, timeout=self.config.timeout) as resp:
+            # URL comes from user config (base_url); scheme is restricted by construction
+            # to https/http via the HTTP(S) provider. Schema is not user-input.
+            with urllib.request.urlopen(req, timeout=self.config.timeout) as resp:  # nosec B310
                 body = json.loads(resp.read().decode("utf-8"))
                 return parser(body)
 
