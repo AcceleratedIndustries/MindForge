@@ -133,6 +133,60 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Output directory containing the knowledge base (default: output)",
     )
 
+    # --- review ---
+    review = subparsers.add_parser(
+        "review",
+        help="Walk the hygiene review queue (conflicts, stale, orphans)",
+    )
+    review.add_argument(
+        "--output", "-o",
+        type=Path,
+        default=Path("output"),
+        help="Output directory (default: output)",
+    )
+
+    # --- eval ---
+    ev = subparsers.add_parser(
+        "eval",
+        help="Run the evaluation harness against a fixture corpus",
+    )
+    ev.add_argument(
+        "--fixtures",
+        type=Path,
+        default=Path("eval/fixtures"),
+        help="Fixture directory containing *.md + *.gt.yaml pairs",
+    )
+    ev.add_argument(
+        "--reports",
+        type=Path,
+        default=Path("eval/reports"),
+        help="Where to write JSON reports (default: eval/reports)",
+    )
+    ev.add_argument(
+        "--mode",
+        choices=["heuristic", "llm"],
+        default="heuristic",
+        help="Extraction mode (default: heuristic)",
+    )
+
+    # --- show ---
+    show = subparsers.add_parser(
+        "show",
+        help="Show a single concept by slug",
+    )
+    show.add_argument("slug", help="Concept slug to display")
+    show.add_argument(
+        "--sources",
+        action="store_true",
+        help="Print source citations (transcript paths + turn indices)",
+    )
+    show.add_argument(
+        "--output", "-o",
+        type=Path,
+        default=Path("output"),
+        help="Output directory (default: output)",
+    )
+
     return parser
 
 
@@ -230,20 +284,102 @@ def cmd_stats(args: argparse.Namespace) -> int:
                 name = concept.name if concept else slug
                 print(f"    {name}: {centrality:.3f}")
 
+    # Review queue summary (Phase 1.3).
+    from collections import Counter
+
+    from mindforge.hygiene.review_queue import build_review_queue
+
+    queue = build_review_queue(store, half_life_days=config.decay_half_life_days)
+    if queue:
+        counts = Counter(item["reason"] for item in queue)
+        print()
+        print("  Review queue:")
+        print(f"    Conflicted:  {counts.get('conflicted', 0)}")
+        print(f"    Stale:       {counts.get('stale', 0)}")
+        print(f"    Orphaned:    {counts.get('orphaned', 0)}")
+
     return 0
 
 
-def cmd_mcp(args: argparse.Namespace) -> int:
-    """Start the MCP server."""
-    from mindforge.mcp.server import create_server
+def cmd_review(args: argparse.Namespace) -> int:
+    """Walk the hygiene review queue."""
+    from mindforge.distillation.concept import ConceptStore
+    from mindforge.hygiene.tui import review_loop
 
     config = MindForgeConfig(output_dir=args.output)
-
     manifest = config.output_dir / "concepts.json"
     if not manifest.exists():
         print("No knowledge base found. Run 'mindforge ingest' first.", file=sys.stderr)
         return 1
 
+    store = ConceptStore.load(manifest)
+    review_loop(store, half_life_days=config.decay_half_life_days)
+    store.save(manifest)
+    return 0
+
+
+def cmd_eval(args: argparse.Namespace) -> int:
+    """Run the evaluation harness and write a JSON report."""
+    from datetime import datetime, timezone
+
+    from mindforge.eval.runner import render_markdown, run_eval
+
+    if not args.fixtures.is_dir():
+        print(f"Fixtures directory not found: {args.fixtures}", file=sys.stderr)
+        return 1
+
+    report = run_eval(args.fixtures, mode=args.mode)
+    print(render_markdown(report))
+
+    args.reports.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    import json
+    (args.reports / f"{stamp}.json").write_text(
+        json.dumps(report, indent=2),
+        encoding="utf-8",
+    )
+    return 0
+
+
+def cmd_show(args: argparse.Namespace) -> int:
+    """Show a single concept, optionally with source citations."""
+    from mindforge.distillation.concept import ConceptStore
+
+    config = MindForgeConfig(output_dir=args.output)
+    manifest = config.output_dir / "concepts.json"
+    if not manifest.exists():
+        print("No knowledge base found. Run 'mindforge ingest' first.", file=sys.stderr)
+        return 1
+
+    store = ConceptStore.load(manifest)
+    concept = store.get(args.slug)
+    if not concept:
+        print(f"Unknown concept: {args.slug}", file=sys.stderr)
+        return 1
+
+    print(concept.name)
+    print(f"  {concept.definition}")
+    if args.sources:
+        if concept.sources:
+            print("Sources:")
+            for s in concept.sources:
+                turns = ", ".join(str(i) for i in s.turn_indices)
+                print(f"  {s.transcript_path} (turns {turns})")
+        else:
+            print("Sources: (none)")
+    return 0
+
+
+def cmd_mcp(args: argparse.Namespace) -> int:
+    """Start the multi-KB MCP server.
+
+    The server reads MINDFORGE_ROOT from the environment (defaults to
+    ~/.mindforge). The legacy --output flag is kept for backwards
+    compatibility but no longer gates server startup.
+    """
+    from mindforge.mcp.server import create_server
+
+    config = MindForgeConfig(output_dir=args.output)
     server = create_server(config)
     server.run()
     return 0
@@ -262,6 +398,9 @@ def main() -> int:
         "query": cmd_query,
         "stats": cmd_stats,
         "mcp": cmd_mcp,
+        "show": cmd_show,
+        "eval": cmd_eval,
+        "review": cmd_review,
     }
 
     handler = commands.get(args.command)

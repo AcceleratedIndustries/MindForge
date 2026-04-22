@@ -27,6 +27,23 @@ from mindforge.llm.extractor import extract_concepts_llm
 from mindforge.query.engine import QueryEngine
 
 
+def _write_all_provenance(concepts, provenance_dir: Path) -> int:
+    """Write one provenance JSON per concept that has sources. Returns file count."""
+    count = 0
+    provenance_dir.mkdir(parents=True, exist_ok=True)
+    for concept in concepts:
+        if not concept.sources:
+            continue
+        path = provenance_dir / f"{concept.slug}.json"
+        path.write_text(json.dumps({
+            "slug": concept.slug,
+            "name": concept.name,
+            "sources": [s.to_dict() for s in concept.sources],
+        }, indent=2), encoding="utf-8")
+        count += 1
+    return count
+
+
 @dataclass
 class PipelineResult:
     """Result of a pipeline run."""
@@ -104,16 +121,27 @@ class MindForgePipeline:
 
         # === Stage 4: Distillation ===
         print("[4/6] Distilling concepts...")
+        # Build a chunk map so the distiller can attach SourceRef citations.
+        chunk_map = {c.id: c for c in all_chunks}
         # Use smart distiller that handles both LLM and heuristic concepts
-        concepts = distill_all_smart(deduped)
+        concepts = distill_all_smart(deduped, chunk_map)
 
         # Add to store (handles merging with existing concepts)
         for concept in concepts:
             self.store.add(concept)
 
+        # Stamp last_reinforced_at for hygiene bookkeeping.
+        from datetime import datetime, timezone
+        now_iso = datetime.now(timezone.utc).isoformat()
+        for concept in self.store.all():
+            concept.last_reinforced_at = now_iso
+
         # Save manifest
         manifest_path = self.config.output_dir / "concepts.json"
         self.store.save(manifest_path)
+
+        # Write per-concept provenance JSON files.
+        _write_all_provenance(self.store.all(), self.config.provenance_dir)
 
         # === Stage 5: Linking ===
         print("[5/6] Detecting links and relationships...")

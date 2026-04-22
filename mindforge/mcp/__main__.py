@@ -1,29 +1,21 @@
-"""Entry point for python -m mindforge.mcp.server
+"""Entry point for `python -m mindforge.mcp.server`.
 
-Runs the MindForge MCP server.
+Runs the MindForge MCP server with multi-KB support. Reads MINDFORGE_ROOT
+from the environment (defaults to ~/.mindforge).
 """
 
 from __future__ import annotations
 
-import os
+import asyncio
 import sys
-from pathlib import Path
+
+from mindforge.mcp.server import main
 
 
-def main() -> int:
-    """Start the MCP server."""
-    from mindforge.mcp.server import create_server
-    from mindforge.config import MindForgeConfig
-    
-    # Check for MINDFORGE_OUTPUT env var first
-    output_dir = Path(os.environ.get("MINDFORGE_OUTPUT", "/home/will/knowledge-base"))
-    
-    config = MindForgeConfig(output_dir=output_dir)
-    
-    server = create_server(config)
-    server.run()
+def run() -> int:
+    asyncio.run(main())
     return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(run())

@@ -1,0 +1,25 @@
+name: eval
+
+on:
+  pull_request:
+    paths:
+      - "mindforge/ingestion/**"
+      - "mindforge/distillation/**"
+      - "mindforge/llm/**"
+      - "mindforge/linking/**"
+      - "eval/fixtures/**"
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev,eval]"
+      - name: Run heuristic eval
+        run: python -m mindforge.cli eval --fixtures eval/fixtures --mode heuristic

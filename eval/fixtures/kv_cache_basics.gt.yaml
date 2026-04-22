@@ -1,0 +1,14 @@
+expected_concepts:
+  - name: "KV Cache"
+    slug: "kv-cache"
+    must_have_tags: []
+    key_phrases:
+      - "Key and Value"
+      - "autoregressive"
+
+  - name: "Multi-Query Attention"
+    slug: "multi-query-attention"
+    key_phrases:
+      - "sharing Key and Value"
+
+expected_relationships: []

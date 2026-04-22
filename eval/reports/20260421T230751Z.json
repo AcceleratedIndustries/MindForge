@@ -1,0 +1,20 @@
+{
+  "timestamp": "2026-04-21T23:07:51.950524+00:00",
+  "mode": "heuristic",
+  "corpus_size": 4,
+  "concepts": {
+    "recall": 0.444,
+    "precision": 0.4,
+    "phrase_grounding": 1.0,
+    "matched": 4,
+    "expected": 9,
+    "extracted": 10
+  },
+  "relationships": {
+    "recall": 1.0,
+    "type_accuracy": 1.0,
+    "matched": 0,
+    "expected": 0,
+    "found": 9
+  }
+}

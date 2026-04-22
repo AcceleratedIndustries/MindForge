@@ -7,16 +7,12 @@ with support for multiple topic-based knowledge bases.
 
 from __future__ import annotations
 
-import os
-import sys
 import json
+import os
 import shutil
 from pathlib import Path
 from datetime import datetime
 from typing import Optional
-
-# Add MindForge to path
-sys.path.insert(0, os.environ.get("PYTHONPATH", "/home/will/MindForge"))
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
@@ -30,15 +26,24 @@ from mcp.types import (
 from mindforge.config import MindForgeConfig
 from mindforge.distillation.concept import ConceptStore
 from mindforge.graph.builder import KnowledgeGraph
+from mindforge.mcp.adapter import get_adapter
+from mindforge.paths import MindForgePaths
 from mindforge.query.engine import QueryEngine
 from mindforge.utils.text import slugify
 
 
-# Base paths
-MINDFORGE_ROOT = Path(os.environ.get("MINDFORGE_ROOT", os.path.expanduser("~/.hermes/mindforge")))
-KBS_DIR = MINDFORGE_ROOT / "kbs"
-TRASH_DIR = MINDFORGE_ROOT / "trash"
-REGISTRY_FILE = MINDFORGE_ROOT / "registry.json"
+# Client adapter: resolved once per process. DefaultAdapter is pass-through;
+# future per-client quirks plug in via MINDFORGE_MCP_ADAPTER or register_adapter().
+_ADAPTER = get_adapter()
+
+
+# Base paths — resolved from MINDFORGE_ROOT or the default ~/.mindforge.
+# Hermes users opt in by setting MINDFORGE_ROOT=~/.hermes/mindforge.
+_PATHS = MindForgePaths.resolve()
+MINDFORGE_ROOT = _PATHS.root
+KBS_DIR = _PATHS.kbs_dir
+TRASH_DIR = _PATHS.trash_dir
+REGISTRY_FILE = _PATHS.registry_file
 
 
 def ensure_structure():
@@ -529,6 +534,14 @@ CONCEPT_TOOLS: list[Tool] = [
             "properties": {},
         },
     ),
+    Tool(
+        name="list_review_queue",
+        description="List concepts in the hygiene review queue (conflicted, stale, orphaned).",
+        inputSchema={
+            "type": "object",
+            "properties": {},
+        },
+    ),
 ]
 
 ALL_TOOLS = KB_TOOLS + SEARCH_TOOLS + CONCEPT_TOOLS
@@ -710,6 +723,7 @@ async def handle_tool(name: str, arguments: dict) -> list[TextContent | ImageCon
                 {"target": r.target, "type": r.rel_type.value}
                 for r in concept.relationships
             ],
+            "sources": [s.to_dict() for s in concept.sources],
         }
         return [TextContent(type="text", text=json.dumps(data, indent=2))]
     
@@ -812,8 +826,20 @@ async def handle_tool(name: str, arguments: dict) -> list[TextContent | ImageCon
                         "centrality": round(centrality, 3),
                     })
                 stats["most_central"] = central
-        
+
         return [TextContent(type="text", text=json.dumps(stats, indent=2))]
+
+    elif name == "list_review_queue":
+        from mindforge.hygiene.review_queue import build_review_queue
+
+        try:
+            kb = manager.require_active()
+        except RuntimeError as e:
+            return [TextContent(type="text", text=str(e))]
+        if kb.store is None:
+            return [TextContent(type="text", text=json.dumps([]))]
+        items = build_review_queue(kb.store)
+        return [TextContent(type="text", text=json.dumps(items, indent=2))]
     
     else:
         return [TextContent(type="text", text=f"Unknown tool: {name}")]
@@ -826,16 +852,32 @@ async def list_tools() -> list[Tool]:
 
 
 async def main():
-    """Run the MCP server."""
-    # Initialize manager on startup
+    """Run the MCP server (async)."""
     get_manager()
-    
     async with stdio_server() as (read_stream, write_stream):
         await app.run(
             read_stream,
             write_stream,
             app.create_initialization_options()
         )
+
+
+class _ServerShim:
+    """Sync wrapper returned by create_server() for CLI callers."""
+
+    def __init__(self, config: Optional["MindForgeConfig"] = None) -> None:
+        self.config = config
+
+    def run(self) -> None:
+        import asyncio
+        asyncio.run(main())
+
+
+def create_server(config: Optional["MindForgeConfig"] = None) -> _ServerShim:
+    """Return a runnable server object. ``config`` is currently unused;
+    the multi-KB server reads MINDFORGE_ROOT from the environment.
+    """
+    return _ServerShim(config)
 
 
 if __name__ == "__main__":

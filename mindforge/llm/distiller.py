@@ -10,9 +10,14 @@ For concepts NOT extracted by the LLM, falls back to the standard distiller.
 from __future__ import annotations
 
 import re
+from typing import Optional
 
 from mindforge.distillation.concept import Concept, Relationship, RelationshipType
-from mindforge.distillation.distiller import distill_concept as heuristic_distill
+from mindforge.distillation.distiller import (
+    _build_source_refs,
+    distill_concept as heuristic_distill,
+)
+from mindforge.ingestion.chunker import Chunk
 from mindforge.ingestion.extractor import RawConcept
 from mindforge.utils.text import extract_keywords, extract_sentences, normalize_whitespace
 
@@ -72,7 +77,10 @@ def _clean_markers(text: str) -> str:
     return text.strip()
 
 
-def distill_llm_concept(raw: RawConcept) -> Concept:
+def distill_llm_concept(
+    raw: RawConcept,
+    chunk_map: Optional[dict[str, Chunk]] = None,
+) -> Concept:
     """Distill a concept that was extracted by the LLM.
 
     The LLM extractor embeds structured metadata in the raw_content:
@@ -81,7 +89,8 @@ def distill_llm_concept(raw: RawConcept) -> Concept:
 
     This distiller extracts that metadata and produces a clean Concept
     with proper relationships and tags, while also using the LLM's
-    higher-quality definition and explanation directly.
+    higher-quality definition and explanation directly. When a chunk_map
+    is provided, SourceRef citations are attached.
     """
     from mindforge.utils.text import slugify
 
@@ -133,6 +142,10 @@ def distill_llm_concept(raw: RawConcept) -> Concept:
     # Use embedded tags, falling back to keyword extraction
     tags = embedded_tags if embedded_tags else extract_keywords(cleaned, top_n=5)
 
+    sources = []
+    if chunk_map:
+        sources = _build_source_refs(raw.source_chunks, chunk_map)
+
     return Concept(
         name=raw.name.strip(),
         definition=definition,
@@ -144,20 +157,27 @@ def distill_llm_concept(raw: RawConcept) -> Concept:
         confidence=raw.confidence,
         links=link_names,
         relationships=relationships,
+        sources=sources,
     )
 
 
-def distill_concept_smart(raw: RawConcept) -> Concept:
+def distill_concept_smart(
+    raw: RawConcept,
+    chunk_map: Optional[dict[str, Chunk]] = None,
+) -> Concept:
     """Distill a concept using the appropriate method based on extraction source.
 
     LLM-extracted concepts get the LLM-aware distiller.
     Heuristic-extracted concepts get the standard distiller.
     """
     if raw.extraction_method == "llm":
-        return distill_llm_concept(raw)
-    return heuristic_distill(raw)
+        return distill_llm_concept(raw, chunk_map)
+    return heuristic_distill(raw, chunk_map)
 
 
-def distill_all_smart(raws: list[RawConcept]) -> list[Concept]:
+def distill_all_smart(
+    raws: list[RawConcept],
+    chunk_map: Optional[dict[str, Chunk]] = None,
+) -> list[Concept]:
     """Distill all raw concepts, using the appropriate distiller for each."""
-    return [distill_concept_smart(raw) for raw in raws]
+    return [distill_concept_smart(raw, chunk_map) for raw in raws]

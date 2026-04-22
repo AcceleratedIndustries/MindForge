@@ -1,0 +1,19 @@
+expected_concepts:
+  - name: "Retrieval-Augmented Generation"
+    slug: "retrieval-augmented-generation"
+    key_phrases:
+      - "retrieves relevant documents"
+
+  - name: "Vector Embeddings"
+    slug: "vector-embeddings"
+    key_phrases:
+      - "dense numerical representations"
+      - "cosine similarity"
+
+  - name: "Hybrid Retrieval"
+    slug: "hybrid-retrieval"
+    key_phrases:
+      - "keyword search"
+      - "semantic search"
+
+expected_relationships: []

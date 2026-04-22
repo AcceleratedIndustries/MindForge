@@ -1,0 +1,14 @@
+expected_concepts:
+  - name: "Postgres"
+    slug: "postgres"
+    key_phrases: ["pgvector", "production"]
+
+  - name: "DuckDB"
+    slug: "duckdb"
+    key_phrases: ["embedded", "analytical"]
+
+  - name: "SQLite"
+    slug: "sqlite"
+    key_phrases: ["embedded"]
+
+expected_relationships: []
