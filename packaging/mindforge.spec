@@ -1,0 +1,87 @@
+# PyInstaller spec for the mindforge CLI (core binary).
+#
+# Core binary excludes sentence-transformers / faiss / torch to keep
+# artifact size < 30MB. Users who want embeddings install via pip.
+
+block_cipher = None
+
+a = Analysis(
+    ["../mindforge/cli.py"],
+    pathex=["."],
+    binaries=[],
+    datas=[],
+    hiddenimports=[
+        "mindforge",
+        "mindforge.cli",
+        "mindforge.pipeline",
+        "mindforge.config",
+        "mindforge.paths",
+        "mindforge.mcp.server",
+        "mindforge.mcp.adapter",
+        "mindforge.ingestion.parser",
+        "mindforge.ingestion.chunker",
+        "mindforge.ingestion.extractor",
+        "mindforge.ingestion.sources",
+        "mindforge.distillation.concept",
+        "mindforge.distillation.distiller",
+        "mindforge.distillation.deduplicator",
+        "mindforge.distillation.renderer",
+        "mindforge.distillation.source_ref",
+        "mindforge.hygiene.conflict_detector",
+        "mindforge.hygiene.decay",
+        "mindforge.hygiene.review_queue",
+        "mindforge.hygiene.markers",
+        "mindforge.hygiene.tui",
+        "mindforge.eval.corpus",
+        "mindforge.eval.scorer",
+        "mindforge.eval.runner",
+        "mindforge.graph.builder",
+        "mindforge.linking.linker",
+        "mindforge.llm.client",
+        "mindforge.llm.distiller",
+        "mindforge.llm.extractor",
+        "mindforge.query.engine",
+        "mindforge.utils.text",
+        "mindforge.storage.fs",
+    ],
+    hookspath=[],
+    hooksconfig={},
+    runtime_hooks=[],
+    excludes=[
+        "sentence_transformers",
+        "faiss",
+        "torch",
+        "numpy",
+        "matplotlib",
+        "pandas",
+        "scipy",
+    ],
+    win_no_prefer_redirects=False,
+    win_private_assemblies=False,
+    cipher=block_cipher,
+    noarchive=False,
+)
+
+pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+
+exe = EXE(
+    pyz,
+    a.scripts,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    [],
+    name="mindforge",
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    runtime_tmpdir=None,
+    console=True,
+    disable_windowed_traceback=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+)
