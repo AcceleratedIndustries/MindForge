@@ -117,6 +117,45 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Use embeddings for semantic search",
     )
+    query.add_argument(
+        "--tag",
+        type=str,
+        default=None,
+        help="Restrict results to concepts carrying this tag",
+    )
+    query.add_argument(
+        "--min-confidence",
+        type=float,
+        default=None,
+        help="Drop results below this confidence floor",
+    )
+    query.add_argument(
+        "--since",
+        type=str,
+        default=None,
+        help="ISO timestamp — keep only concepts reinforced on/after this date",
+    )
+
+    # --- list ---
+    lst = subparsers.add_parser(
+        "list",
+        help="List concepts with optional filters",
+    )
+    lst.add_argument("--tag", type=str, default=None)
+    lst.add_argument(
+        "--since",
+        type=str,
+        default=None,
+        help="ISO timestamp — keep only concepts reinforced on/after this date",
+    )
+    lst.add_argument("--min-confidence", type=float, default=None)
+    lst.add_argument("--limit", type=int, default=None)
+    lst.add_argument(
+        "--output",
+        "-o",
+        type=Path,
+        default=Path("output"),
+    )
 
     # --- stats ---
     stats = subparsers.add_parser(
@@ -129,6 +168,24 @@ def _build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=Path("output"),
         help="Output directory (default: output)",
+    )
+
+    # --- diff ---
+    diff = subparsers.add_parser(
+        "diff",
+        help="Show concept changes since the previous ingest",
+    )
+    diff.add_argument(
+        "--since",
+        type=str,
+        default=None,
+        help="ISO timestamp — compare against the snapshot at/after this time",
+    )
+    diff.add_argument(
+        "--output",
+        "-o",
+        type=Path,
+        default=Path("output"),
     )
 
     # --- mcp ---
@@ -242,15 +299,59 @@ def cmd_ingest(args: argparse.Namespace) -> int:
 
 
 def cmd_query(args: argparse.Namespace) -> int:
-    """Query the knowledge base."""
+    """Query the knowledge base, optionally filtered by tag/confidence/date."""
+    from mindforge.query.engine import filter_concepts
+
     config = MindForgeConfig(
         output_dir=args.output,
         use_embeddings=args.embeddings,
     )
 
     pipeline = MindForgePipeline(config)
-    output = pipeline.query(args.question, top_k=args.top_k)
-    print(output)
+    pipeline._load_state()
+    if pipeline.query_engine is None:
+        print("No knowledge base found. Run 'mindforge ingest' first.", file=sys.stderr)
+        return 1
+
+    results = pipeline.query_engine.search(args.question, top_k=args.top_k)
+
+    # Apply filters post-search so semantic scoring isn't distorted.
+    if args.tag or args.min_confidence is not None or args.since:
+        kept_concepts = filter_concepts(
+            [r.concept for r in results],
+            tag=args.tag,
+            min_confidence=args.min_confidence,
+            since=args.since,
+        )
+        kept_slugs = {c.slug for c in kept_concepts}
+        results = [r for r in results if r.concept.slug in kept_slugs]
+
+    print(pipeline.query_engine.format_results(results))
+    return 0
+
+
+def cmd_list(args: argparse.Namespace) -> int:
+    """List concepts with optional filters."""
+    from mindforge.distillation.concept import ConceptStore
+    from mindforge.query.engine import filter_concepts
+
+    config = MindForgeConfig(output_dir=args.output)
+    manifest = config.output_dir / "concepts.json"
+    if not manifest.exists():
+        print("No knowledge base found. Run 'mindforge ingest' first.", file=sys.stderr)
+        return 1
+
+    store = ConceptStore.load(manifest)
+    results = filter_concepts(
+        store.all(),
+        tag=args.tag,
+        min_confidence=args.min_confidence,
+        since=args.since,
+    )
+    if args.limit:
+        results = results[: args.limit]
+    for c in results:
+        print(f"[{c.confidence:.2f}] {c.slug}  —  {c.name}")
     return 0
 
 
@@ -320,6 +421,54 @@ def cmd_stats(args: argparse.Namespace) -> int:
         print(f"    Stale:       {counts.get('stale', 0)}")
         print(f"    Orphaned:    {counts.get('orphaned', 0)}")
 
+    return 0
+
+
+def compute_diff(manifest_path: Path, since: str | None = None) -> dict[str, list[str]]:
+    """Compare the latest manifest snapshot against the prior one.
+
+    When ``since`` is provided, compare against the oldest snapshot with a
+    timestamp >= ``since`` (other than the current one), falling back to the
+    immediately-prior snapshot if none match.
+    """
+    from mindforge.pipeline import read_manifest_history
+
+    history = read_manifest_history(manifest_path)
+    if len(history) < 2:
+        return {"added": [], "modified": [], "deleted": []}
+    current = history[-1]
+    prior: dict
+    if since:
+        candidates = [h for h in history if h["timestamp"] >= since and h is not current]
+        prior = candidates[0] if candidates else history[-2]
+    else:
+        prior = history[-2]
+    cur_hashes = current["slug_hashes"]
+    prev_hashes = prior["slug_hashes"]
+    added = sorted(set(cur_hashes) - set(prev_hashes))
+    deleted = sorted(set(prev_hashes) - set(cur_hashes))
+    modified = sorted(
+        slug for slug in cur_hashes if slug in prev_hashes and cur_hashes[slug] != prev_hashes[slug]
+    )
+    return {"added": added, "modified": modified, "deleted": deleted}
+
+
+def cmd_diff(args: argparse.Namespace) -> int:
+    """Print added/modified/deleted concepts since the previous snapshot."""
+    config = MindForgeConfig(output_dir=args.output)
+    d = compute_diff(config.output_dir / "manifest.json", since=args.since)
+    if not (d["added"] or d["modified"] or d["deleted"]):
+        print("No changes since previous run.")
+        return 0
+    print(f"Added ({len(d['added'])}):")
+    for s in d["added"]:
+        print(f"  + {s}")
+    print(f"Modified ({len(d['modified'])}):")
+    for s in d["modified"]:
+        print(f"  ~ {s}")
+    print(f"Deleted ({len(d['deleted'])}):")
+    for s in d["deleted"]:
+        print(f"  - {s}")
     return 0
 
 
@@ -424,6 +573,8 @@ def main() -> int:
         "show": cmd_show,
         "eval": cmd_eval,
         "review": cmd_review,
+        "diff": cmd_diff,
+        "list": cmd_list,
     }
 
     handler = commands.get(args.command)
