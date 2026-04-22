@@ -1,0 +1,66 @@
+name: binaries
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            artifact: mindforge-macos-arm64
+          - os: ubuntu-latest
+            artifact: mindforge-linux-x64
+          - os: windows-latest
+            artifact: mindforge-windows-x64.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install project and PyInstaller
+        run: |
+          pip install --upgrade pip
+          pip install -e .
+          pip install pyinstaller
+      - name: Build binary
+        run: pyinstaller packaging/mindforge.spec
+      - name: Stage artifact
+        shell: bash
+        run: |
+          mkdir -p release
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            mv dist/mindforge.exe "release/${{ matrix.artifact }}"
+          else
+            mv dist/mindforge "release/${{ matrix.artifact }}"
+          fi
+      - name: Ad-hoc codesign (macOS)
+        if: runner.os == 'macOS'
+        run: codesign --force --sign - "release/${{ matrix.artifact }}"
+      - name: Smoke test
+        shell: bash
+        run: "release/${{ matrix.artifact }} --help | head -1"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: release/${{ matrix.artifact }}
+
+  attach-to-release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: release/**/*

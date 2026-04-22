@@ -1,0 +1,50 @@
+name: install-smoke
+
+on:
+  schedule:
+    - cron: "0 7 * * 1"   # weekly Monday 07:00 UTC
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  uv-tool-install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install uv
+        run: pip install uv
+      - name: Build sdist
+        run: |
+          pip install build
+          python -m build --sdist
+      - name: Install as tool via uv
+        run: uv tool install ./dist/*.tar.gz
+      - name: Smoke — --help
+        run: uv tool run mindforge -- --help | head -5
+      - name: Smoke — ingest example corpus
+        run: |
+          uv tool run mindforge -- ingest --input examples/transcripts --output /tmp/mf-smoke
+          test -s /tmp/mf-smoke/concepts.json
+
+  pipx-install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install pipx
+        run: pip install pipx
+      - name: Build sdist
+        run: |
+          pip install build
+          python -m build --sdist
+      - name: Install via pipx
+        run: pipx install ./dist/*.tar.gz
+      - name: Smoke — --help
+        run: mindforge --help | head -5
