@@ -69,7 +69,8 @@ class PipelineResult:
             f"  After deduplication:     {self.concepts_after_dedup}",
             f"  Markdown files written:  {self.concept_files_written}",
             f"  Graph edges:             {self.edges_in_graph}",
-            f"  Embeddings built:        {'yes' if self.embeddings_built else 'no (optional deps not installed)'}",
+            f"  Embeddings built:        "
+            f"{'yes' if self.embeddings_built else 'no (optional deps not installed)'}",
         ]
         return "\n".join(lines)
 

@@ -101,7 +101,6 @@ def distill_llm_concept(
     source_slug = slugify(raw.name)
     relationships = _extract_embedded_relationships(raw.raw_content, source_slug)
     embedded_tags = _extract_embedded_tags(raw.raw_content)
-    link_targets = list(dict.fromkeys(r.target for r in relationships))
     link_names = []
     for match in _REL_PATTERN.finditer(raw.raw_content):
         link_names.append(match.group(2).strip())

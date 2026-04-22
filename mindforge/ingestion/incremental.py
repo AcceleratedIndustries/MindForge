@@ -283,7 +283,7 @@ class IncrementalIngest:
     def get_all_concepts(self, include_deleted: bool = False) -> list[RawConcept]:
         """Get all concepts, optionally including deleted."""
         concepts = []
-        for name, meta in self._concepts_meta.items():
+        for _name, meta in self._concepts_meta.items():
             if include_deleted or not meta.get("deleted", False):
                 concepts.append(self._concept_from_meta(meta))
         return concepts

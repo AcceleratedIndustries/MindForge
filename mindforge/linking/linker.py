@@ -65,7 +65,6 @@ def _detect_relationship_type(
     """
     # Look for patterns in sentences that mention both concepts
     sentences = re.split(r"[.!?]\s+", text)
-    source_lower = source_name.lower()
     target_lower = target_name.lower()
 
     for sentence in sentences:
@@ -89,7 +88,6 @@ def detect_links(
     - typed relationships (concept.relationships)
     """
     all_concepts = store.all()
-    all_slugs = store.slugs()
 
     for concept in all_concepts:
         combined_text = f"{concept.definition} {concept.explanation}"

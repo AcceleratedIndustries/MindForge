@@ -186,7 +186,7 @@ class MultiKBManager:
         # Initialize empty files
         empty_store = ConceptStore()
         empty_store.save(kb_path / "concepts.json")
-        open(kb_path / "graph.json", "w").write('{"nodes": [], "edges": []}')
+        (kb_path / "graph.json").write_text('{"nodes": [], "edges": []}')
 
         # Add to registry
         now = datetime.now().isoformat()
@@ -362,7 +362,10 @@ KB_TOOLS: list[Tool] = [
     ),
     Tool(
         name="kb_select",
-        description="Select (activate) a knowledge base by ID. All search operations will target this KB until another is selected.",
+        description=(
+            "Select (activate) a knowledge base by ID. "
+            "All search operations will target this KB until another is selected."
+        ),
         inputSchema={
             "type": "object",
             "properties": {
@@ -419,7 +422,10 @@ KB_TOOLS: list[Tool] = [
 SEARCH_TOOLS: list[Tool] = [
     Tool(
         name="search",
-        description="Search the ACTIVE knowledge base with a natural language query. Returns top matching concepts.",
+        description=(
+            "Search the ACTIVE knowledge base with a natural language query. "
+            "Returns top matching concepts."
+        ),
         inputSchema={
             "type": "object",
             "properties": {
@@ -438,7 +444,10 @@ SEARCH_TOOLS: list[Tool] = [
     ),
     Tool(
         name="search_all",
-        description="Search ALL knowledge bases with a natural language query. Returns results with KB source indicated.",
+        description=(
+            "Search ALL knowledge bases with a natural language query. "
+            "Returns results with KB source indicated."
+        ),
         inputSchema={
             "type": "object",
             "properties": {
@@ -457,7 +466,10 @@ SEARCH_TOOLS: list[Tool] = [
     ),
     Tool(
         name="search_selected",
-        description="Search SELECTED knowledge bases by ID. Provide a list of KB IDs to search across.",
+        description=(
+            "Search SELECTED knowledge bases by ID. "
+            "Provide a list of KB IDs to search across."
+        ),
         inputSchema={
             "type": "object",
             "properties": {
@@ -511,7 +523,10 @@ CONCEPT_TOOLS: list[Tool] = [
     ),
     Tool(
         name="get_neighbors",
-        description="Get concepts related to a given concept via the knowledge graph (from ACTIVE KB).",
+        description=(
+            "Get concepts related to a given concept via the knowledge graph "
+            "(from ACTIVE KB)."
+        ),
         inputSchema={
             "type": "object",
             "properties": {
@@ -636,7 +651,7 @@ async def handle_tool(
         top_k = arguments.get("top_k", 5)
 
         all_results = []
-        for kb_id in manager.registry["kbs"].keys():
+        for kb_id in manager.registry["kbs"]:
             kb = KnowledgeBase(kb_id, KBS_DIR / kb_id)
             kb.load()
 

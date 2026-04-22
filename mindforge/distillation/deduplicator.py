@@ -34,7 +34,7 @@ def deduplicate_concepts(
 
     # Merge within slug groups
     merged: list[RawConcept] = []
-    for slug, group in slug_groups.items():
+    for _slug, group in slug_groups.items():
         primary = max(group, key=lambda c: (c.confidence, len(c.raw_content)))
         for other in group:
             if other is not primary:

@@ -111,7 +111,7 @@ class EmbeddingIndex:
         scores, indices = self._index.search(query_embedding, k)
 
         results = []
-        for score, idx in zip(scores[0], indices[0]):
+        for score, idx in zip(scores[0], indices[0], strict=False):
             if idx < len(self._slugs):
                 results.append((self._slugs[idx], float(score)))
         return results

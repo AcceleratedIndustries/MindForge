@@ -114,7 +114,8 @@ def _clean_content(text: str) -> str:
     """Remove conversational artifacts from extracted text."""
     # Remove references to "the conversation", "I mentioned", "as we discussed"
     fluff_patterns = [
-        r"(?i)\b(?:as (?:I|we) (?:mentioned|discussed|said|noted))(?:\s+(?:earlier|before|above))?\b[,.]?\s*",
+        r"(?i)\b(?:as (?:I|we) (?:mentioned|discussed|said|noted))"
+        r"(?:\s+(?:earlier|before|above))?\b[,.]?\s*",
         r"(?i)\b(?:in (?:our|the|this) (?:conversation|discussion|chat))\b[,.]?\s*",
         r"(?i)\b(?:let me explain|I(?:'ll| will) explain|here's (?:the|an?) explanation)\b[,.]?\s*",
         r"(?i)\b(?:great question|good question|that's a good point)\b[!,.]?\s*",

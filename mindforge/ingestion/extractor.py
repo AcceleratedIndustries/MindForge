@@ -154,11 +154,10 @@ def _is_valid_concept_name(name: str) -> bool:
     if len(words) == 1 and len(name_lower) < 4:
         return False
 
-    # Starts with articles or pronouns
-    if words[0] in ("the", "a", "an", "this", "that", "it", "its"):
-        # Allow if the rest is meaningful and multi-word (e.g., "The KV Cache")
-        if len(words) < 3:
-            return False
+    # Starts with articles or pronouns; allow only if the rest is meaningful
+    # and multi-word (e.g., "The KV Cache").
+    if words[0] in ("the", "a", "an", "this", "that", "it", "its") and len(words) < 3:
+        return False
 
     # Sentences (too long to be a concept name)
     if len(words) > 6:
@@ -200,10 +199,7 @@ def _is_valid_concept_name(name: str) -> bool:
 
     # Reject if name looks like a phrase/clause (contains common verbs)
     verb_indicators = {"is", "are", "was", "were", "has", "have", "uses", "does"}
-    if len(words) > 2 and any(w in verb_indicators for w in words[1:]):
-        return False
-
-    return True
+    return not (len(words) > 2 and any(w in verb_indicators for w in words[1:]))
 
 
 def _extract_definitions(text: str) -> list[RawConcept]:
@@ -214,7 +210,6 @@ def _extract_definitions(text: str) -> list[RawConcept]:
     for pattern in _DEFINITION_PATTERNS:
         for match in pattern.finditer(text):
             name = normalize_whitespace(match.group("term"))
-            definition = normalize_whitespace(match.group("def"))
 
             # Skip if too short, too generic, or already seen
             name_lower = name.lower()
