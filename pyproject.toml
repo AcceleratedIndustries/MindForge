@@ -10,7 +10,7 @@ requires-python = ">=3.10"
 license = { text = "BUSL-1.1" }
 
 dependencies = [
-    "networkx>=3.0",
+    "networkx>=3.4.2",
     "pyyaml>=6.0",
 ]
 
