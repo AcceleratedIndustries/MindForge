@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from mindforge.config import MindForgeConfig
+from mindforge.distillation.concept import Concept, ConceptStore
 from mindforge.pipeline import MindForgePipeline
 
 
@@ -251,11 +252,39 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Print source citations (transcript paths + turn indices)",
     )
     show.add_argument(
+        "--neighbors",
+        action="store_true",
+        help="Print graph-connected concepts",
+    )
+    show.add_argument(
+        "--raw",
+        action="store_true",
+        help="Print the concept markdown file as-is",
+    )
+    show.add_argument(
         "--output",
         "-o",
         type=Path,
         default=Path("output"),
         help="Output directory (default: output)",
+    )
+
+    # --- open ---
+    op = subparsers.add_parser(
+        "open",
+        help="Open a concept file (or the graph JSON) in $EDITOR",
+    )
+    op.add_argument("slug", nargs="?", default=None)
+    op.add_argument(
+        "--graph",
+        action="store_true",
+        help="Open the knowledge graph JSON",
+    )
+    op.add_argument(
+        "--output",
+        "-o",
+        type=Path,
+        default=Path("output"),
     )
 
     return parser
@@ -514,8 +543,43 @@ def cmd_eval(args: argparse.Namespace) -> int:
     return 0
 
 
+def _render_show(
+    concept: Concept,
+    *,
+    sources: bool,
+    neighbors: bool,
+    raw: bool,
+    store: ConceptStore | None,
+) -> str:
+    """Format a concept for CLI display. Extracted for test visibility."""
+    from mindforge.distillation.renderer import render_concept
+
+    if raw:
+        return render_concept(concept)
+
+    lines: list[str] = []
+    lines.append(concept.name)
+    lines.append(f"  {concept.definition}")
+    if sources:
+        if concept.sources:
+            lines.append("Sources:")
+            for s in concept.sources:
+                turns = ", ".join(str(i) for i in s.turn_indices)
+                lines.append(f"  {s.transcript_path} (turns {turns})")
+        else:
+            lines.append("Sources: (none)")
+    if neighbors:
+        if concept.relationships:
+            lines.append("Neighbors:")
+            for r in concept.relationships:
+                lines.append(f"  {r.rel_type.value} → {r.target}")
+        else:
+            lines.append("Neighbors: (none)")
+    return "\n".join(lines)
+
+
 def cmd_show(args: argparse.Namespace) -> int:
-    """Show a single concept, optionally with source citations."""
+    """Show a single concept, optionally with sources, neighbors, or raw markdown."""
     from mindforge.distillation.concept import ConceptStore
 
     config = MindForgeConfig(output_dir=args.output)
@@ -530,17 +594,41 @@ def cmd_show(args: argparse.Namespace) -> int:
         print(f"Unknown concept: {args.slug}", file=sys.stderr)
         return 1
 
-    print(concept.name)
-    print(f"  {concept.definition}")
-    if args.sources:
-        if concept.sources:
-            print("Sources:")
-            for s in concept.sources:
-                turns = ", ".join(str(i) for i in s.turn_indices)
-                print(f"  {s.transcript_path} (turns {turns})")
-        else:
-            print("Sources: (none)")
+    print(
+        _render_show(
+            concept,
+            sources=args.sources,
+            neighbors=args.neighbors,
+            raw=args.raw,
+            store=store,
+        )
+    )
     return 0
+
+
+def cmd_open(args: argparse.Namespace) -> int:
+    """Open a concept file or the graph JSON in $EDITOR."""
+    import os
+    import subprocess
+
+    editor = os.environ.get("EDITOR", "vi")
+    config = MindForgeConfig(output_dir=args.output)
+
+    if args.graph:
+        target = config.graph_dir / "knowledge_graph.json"
+        if not target.exists():
+            print("No graph yet. Run 'mindforge ingest' first.", file=sys.stderr)
+            return 1
+        return subprocess.call([editor, str(target)])
+
+    if not args.slug:
+        print("Provide a slug or use --graph.", file=sys.stderr)
+        return 1
+    target = config.concepts_dir / f"{args.slug}.md"
+    if not target.exists():
+        print(f"Concept file not found: {target}", file=sys.stderr)
+        return 1
+    return subprocess.call([editor, str(target)])
 
 
 def cmd_mcp(args: argparse.Namespace) -> int:
@@ -576,6 +664,7 @@ def main() -> int:
         "review": cmd_review,
         "diff": cmd_diff,
         "list": cmd_list,
+        "open": cmd_open,
     }
 
     handler = commands.get(args.command)
