@@ -54,6 +54,11 @@ def _build_parser() -> argparse.ArgumentParser:
         default=0.75,
         help="Similarity threshold for deduplication (default: 0.75)",
     )
+    ingest.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Preview diff against the existing KB without writing anything",
+    )
 
     # LLM extraction options
     llm_group = ingest.add_argument_group("LLM extraction")
@@ -220,10 +225,19 @@ def cmd_ingest(args: argparse.Namespace) -> int:
     print()
 
     pipeline = MindForgePipeline(config)
-    result = pipeline.run()
+    result = pipeline.run(dry_run=args.dry_run)
 
     print()
-    print(result.summary())
+    if result.dry_run:
+        print("Dry run — no files written.")
+        print(f"  Would keep {result.concepts_after_dedup} concepts.")
+        print(
+            f"  New: {result.new}  Updated: {result.updated}  "
+            f"Unchanged: {result.unchanged}  Removed: {result.removed}"
+        )
+        print("  Run without --dry-run to apply.")
+    else:
+        print(result.summary())
     return 0
 
 

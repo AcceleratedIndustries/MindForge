@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 from mindforge.config import MindForgeConfig
 from mindforge.distillation.concept import Concept, ConceptStore
@@ -24,6 +26,32 @@ from mindforge.llm.client import LLMClient, LLMConfig
 from mindforge.llm.distiller import distill_all_smart
 from mindforge.llm.extractor import extract_concepts_llm
 from mindforge.query.engine import QueryEngine
+
+
+def write_manifest_snapshot(store: ConceptStore, manifest_path: Path) -> None:
+    """Append a timestamped snapshot of slug hashes to manifest_path."""
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    slug_hashes = {c.slug: c.hash for c in store.all()}
+    snapshot = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "slug_hashes": slug_hashes,
+    }
+    data: dict[str, Any]
+    if manifest_path.exists():
+        data = json.loads(manifest_path.read_text(encoding="utf-8"))
+    else:
+        data = {"version": 1, "history": []}
+    data.setdefault("history", []).append(snapshot)
+    manifest_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
+def read_manifest_history(manifest_path: Path) -> list[dict[str, Any]]:
+    """Return the history list from manifest.json, or [] if missing."""
+    if not manifest_path.exists():
+        return []
+    data = json.loads(manifest_path.read_text(encoding="utf-8"))
+    history: list[dict[str, Any]] = data.get("history", [])
+    return history
 
 
 def _write_all_provenance(concepts: list[Concept], provenance_dir: Path) -> int:
@@ -59,6 +87,11 @@ class PipelineResult:
     edges_in_graph: int
     embeddings_built: bool
     extraction_method: str = "heuristic"
+    dry_run: bool = False
+    new: int = 0
+    updated: int = 0
+    unchanged: int = 0
+    removed: int = 0
 
     def summary(self) -> str:
         lines = [
@@ -85,8 +118,14 @@ class MindForgePipeline:
         self.embedding_index: EmbeddingIndex | None = None
         self.query_engine: QueryEngine | None = None
 
-    def run(self) -> PipelineResult:
-        """Execute the full pipeline: ingest → extract → distill → link → graph → index."""
+    def run(self, dry_run: bool = False) -> PipelineResult:
+        """Execute the full pipeline: ingest → extract → distill → link → graph → index.
+
+        When ``dry_run`` is True, the pipeline runs through extraction and
+        distillation, computes a diff against the existing on-disk manifest,
+        and returns without writing concept files, graph, provenance, or
+        updating the manifest.
+        """
         self.config.ensure_dirs()
 
         # === Stage 1: Ingestion ===
@@ -138,15 +177,47 @@ class MindForgePipeline:
             self.store.add(concept)
 
         # Stamp last_reinforced_at for hygiene bookkeeping.
-        from datetime import datetime, timezone
-
         now_iso = datetime.now(timezone.utc).isoformat()
         for concept in self.store.all():
             concept.last_reinforced_at = now_iso
 
+        # Short-circuit for dry-run: diff against existing manifest, don't write.
+        if dry_run:
+            existing = ConceptStore.load(self.config.output_dir / "concepts.json")
+            new_count = sum(1 for s in self.store.concepts if s not in existing.concepts)
+            updated_count = sum(
+                1
+                for slug, c in self.store.concepts.items()
+                if slug in existing.concepts and existing.concepts[slug].hash != c.hash
+            )
+            unchanged_count = sum(
+                1
+                for slug, c in self.store.concepts.items()
+                if slug in existing.concepts and existing.concepts[slug].hash == c.hash
+            )
+            removed_count = sum(
+                1 for slug in existing.concepts if slug not in self.store.concepts
+            )
+            return PipelineResult(
+                concepts_extracted=len(raw_concepts),
+                concepts_after_dedup=len(deduped),
+                concept_files_written=0,
+                edges_in_graph=0,
+                embeddings_built=False,
+                extraction_method=extraction_method,
+                dry_run=True,
+                new=new_count,
+                updated=updated_count,
+                unchanged=unchanged_count,
+                removed=removed_count,
+            )
+
         # Save manifest
         manifest_path = self.config.output_dir / "concepts.json"
         self.store.save(manifest_path)
+
+        # Write timestamped manifest-history snapshot for `mindforge diff`.
+        write_manifest_snapshot(self.store, self.config.output_dir / "manifest.json")
 
         # Write per-concept provenance JSON files.
         _write_all_provenance(self.store.all(), self.config.provenance_dir)
