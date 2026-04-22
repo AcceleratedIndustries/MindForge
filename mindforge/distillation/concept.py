@@ -19,6 +19,7 @@ from mindforge.utils.text import content_hash, slugify
 
 class RelationshipType(str, Enum):
     """Types of relationships between concepts."""
+
     USES = "uses"
     IMPROVES = "improves"
     DEPENDS_ON = "depends_on"
@@ -32,6 +33,7 @@ class RelationshipType(str, Enum):
 @dataclass
 class Relationship:
     """A directed relationship between two concepts."""
+
     source: str  # concept slug
     target: str  # concept slug
     rel_type: RelationshipType
@@ -58,6 +60,7 @@ class Relationship:
 @dataclass
 class Concept:
     """An atomic knowledge concept extracted from transcripts."""
+
     name: str
     definition: str  # 2-3 sentence definition
     explanation: str  # Expanded explanation
@@ -143,8 +146,14 @@ class Concept:
             merged_refs.append(ref)
 
         # Keep the longer/better explanation
-        explanation = self.explanation if len(self.explanation) >= len(other.explanation) else other.explanation
-        definition = self.definition if len(self.definition) >= len(other.definition) else other.definition
+        explanation = (
+            self.explanation
+            if len(self.explanation) >= len(other.explanation)
+            else other.explanation
+        )
+        definition = (
+            self.definition if len(self.definition) >= len(other.definition) else other.definition
+        )
 
         return Concept(
             name=self.name,
@@ -164,6 +173,7 @@ class Concept:
 @dataclass
 class ConceptStore:
     """In-memory store for all concepts, supporting lookup and persistence."""
+
     concepts: dict[str, Concept] = field(default_factory=dict)  # slug -> Concept
 
     def add(self, concept: Concept) -> None:
@@ -205,6 +215,7 @@ class ConceptStore:
                     missing += 1
             if missing:
                 import sys
+
                 print(
                     f"[mindforge] warning: {missing} concept(s) have no provenance. "
                     "Re-ingest to populate sources.",

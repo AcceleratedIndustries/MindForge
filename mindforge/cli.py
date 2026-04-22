@@ -30,13 +30,15 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Ingest transcripts and build the knowledge base",
     )
     ingest.add_argument(
-        "--input", "-i",
+        "--input",
+        "-i",
         type=Path,
         default=Path("examples/transcripts"),
         help="Directory containing transcript files (default: examples/transcripts)",
     )
     ingest.add_argument(
-        "--output", "-o",
+        "--output",
+        "-o",
         type=Path,
         default=Path("output"),
         help="Output directory (default: output)",
@@ -92,13 +94,15 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Natural language question to search for",
     )
     query.add_argument(
-        "--top-k", "-k",
+        "--top-k",
+        "-k",
         type=int,
         default=5,
         help="Number of results to return (default: 5)",
     )
     query.add_argument(
-        "--output", "-o",
+        "--output",
+        "-o",
         type=Path,
         default=Path("output"),
         help="Output directory to load knowledge base from",
@@ -115,7 +119,8 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Show knowledge base statistics",
     )
     stats.add_argument(
-        "--output", "-o",
+        "--output",
+        "-o",
         type=Path,
         default=Path("output"),
         help="Output directory (default: output)",
@@ -127,7 +132,8 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Start the MCP (Model Context Protocol) server for AI agent access",
     )
     mcp.add_argument(
-        "--output", "-o",
+        "--output",
+        "-o",
         type=Path,
         default=Path("output"),
         help="Output directory containing the knowledge base (default: output)",
@@ -139,7 +145,8 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Walk the hygiene review queue (conflicts, stale, orphans)",
     )
     review.add_argument(
-        "--output", "-o",
+        "--output",
+        "-o",
         type=Path,
         default=Path("output"),
         help="Output directory (default: output)",
@@ -181,7 +188,8 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Print source citations (transcript paths + turn indices)",
     )
     show.add_argument(
-        "--output", "-o",
+        "--output",
+        "-o",
         type=Path,
         default=Path("output"),
         help="Output directory (default: output)",
@@ -334,6 +342,7 @@ def cmd_eval(args: argparse.Namespace) -> int:
     args.reports.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     import json
+
     (args.reports / f"{stamp}.json").write_text(
         json.dumps(report, indent=2),
         encoding="utf-8",

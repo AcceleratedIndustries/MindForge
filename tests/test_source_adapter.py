@@ -23,8 +23,7 @@ def test_markdown_adapter_implements_protocol():
 def test_markdown_adapter_matches_existing_parser(tmp_path: Path):
     transcript = tmp_path / "t.md"
     transcript.write_text(
-        "Human: What is attention?\n\n"
-        "Assistant: A mechanism that weighs tokens.\n"
+        "Human: What is attention?\n\nAssistant: A mechanism that weighs tokens.\n"
     )
     adapter = MarkdownSourceAdapter()
     adapter_result = adapter.parse(transcript)

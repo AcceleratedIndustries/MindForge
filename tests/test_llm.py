@@ -31,41 +31,44 @@ from mindforge.llm.extractor import (
 
 # === Sample LLM responses for testing ===
 
-VALID_LLM_RESPONSE = json.dumps({
-    "concepts": [
-        {
-            "name": "Vector Embeddings",
-            "definition": "Dense numerical representations of data in a continuous vector space.",
-            "explanation": "Each piece of data is mapped to a fixed-length array of floating-point numbers. Similar concepts end up close together in the vector space.",
-            "insights": [
-                "Capture semantic meaning in numerical form",
-                "Enable similarity computation via cosine distance",
-            ],
-            "examples": ["Word2Vec maps words to 300-dimensional vectors"],
-            "tags": ["ml", "nlp", "vectors"],
-            "relationships": [
-                {"target": "Semantic Search", "type": "enables"},
-                {"target": "Neural Networks", "type": "depends_on"},
-            ],
-        },
-        {
-            "name": "Semantic Search",
-            "definition": "Information retrieval that understands meaning rather than matching keywords.",
-            "explanation": "Uses vector embeddings to find documents similar in meaning to a query.",
-            "insights": ["Handles synonyms and paraphrases"],
-            "examples": [],
-            "tags": ["search", "nlp"],
-            "relationships": [
-                {"target": "Vector Embeddings", "type": "uses"},
-            ],
-        },
-    ]
-})
+VALID_LLM_RESPONSE = json.dumps(
+    {
+        "concepts": [
+            {
+                "name": "Vector Embeddings",
+                "definition": "Dense numerical representations of data in a continuous vector space.",
+                "explanation": "Each piece of data is mapped to a fixed-length array of floating-point numbers. Similar concepts end up close together in the vector space.",
+                "insights": [
+                    "Capture semantic meaning in numerical form",
+                    "Enable similarity computation via cosine distance",
+                ],
+                "examples": ["Word2Vec maps words to 300-dimensional vectors"],
+                "tags": ["ml", "nlp", "vectors"],
+                "relationships": [
+                    {"target": "Semantic Search", "type": "enables"},
+                    {"target": "Neural Networks", "type": "depends_on"},
+                ],
+            },
+            {
+                "name": "Semantic Search",
+                "definition": "Information retrieval that understands meaning rather than matching keywords.",
+                "explanation": "Uses vector embeddings to find documents similar in meaning to a query.",
+                "insights": ["Handles synonyms and paraphrases"],
+                "examples": [],
+                "tags": ["search", "nlp"],
+                "relationships": [
+                    {"target": "Vector Embeddings", "type": "uses"},
+                ],
+            },
+        ]
+    }
+)
 
 MARKDOWN_WRAPPED_RESPONSE = "```json\n" + VALID_LLM_RESPONSE + "\n```"
 
 
 # === Tests for JSON parsing ===
+
 
 class TestExtractJsonFromResponse:
     def test_plain_json(self):
@@ -79,7 +82,7 @@ class TestExtractJsonFromResponse:
         assert len(result["concepts"]) == 2
 
     def test_json_with_surrounding_text(self):
-        text = 'Here are the concepts:\n' + VALID_LLM_RESPONSE + '\nDone.'
+        text = "Here are the concepts:\n" + VALID_LLM_RESPONSE + "\nDone."
         result = _extract_json_from_response(text)
         assert result is not None
 
@@ -97,6 +100,7 @@ class TestExtractJsonFromResponse:
 
 
 # === Tests for concept parsing ===
+
 
 class TestParseLLMConcepts:
     def test_parse_valid_response(self):
@@ -138,6 +142,7 @@ class TestParseLLMConcepts:
 
 # === Tests for chunk batching ===
 
+
 class TestBatchChunks:
     def _make_chunk(self, content: str, index: int = 0) -> Chunk:
         return Chunk(
@@ -169,6 +174,7 @@ class TestBatchChunks:
 
 
 # === Tests for LLM-aware distillation ===
+
 
 class TestEmbeddedMetadata:
     def test_extract_relationships(self):
@@ -260,6 +266,7 @@ class TestDistillConceptSmart:
 
 # === Tests for LLM client ===
 
+
 class TestLLMConfig:
     def test_ollama_defaults(self):
         config = LLMConfig()
@@ -289,6 +296,7 @@ class TestLLMClient:
 
 
 # === Tests for extract_concepts_llm with mocked client ===
+
 
 class TestExtractConceptsLLM:
     def _make_chunk(self, content: str, index: int = 0) -> Chunk:
@@ -320,7 +328,9 @@ class TestExtractConceptsLLM:
 
         client = MagicMock(spec=LLMClient)
         client.generate.return_value = LLMResponse(
-            content="", success=False, error="Connection refused",
+            content="",
+            success=False,
+            error="Connection refused",
         )
 
         concepts, stats = extract_concepts_llm(chunks, client)
@@ -346,9 +356,9 @@ class TestExtractConceptsLLM:
         client = MagicMock(spec=LLMClient)
         # Both batches return the same concept
         client.generate.return_value = LLMResponse(
-            content=json.dumps({
-                "concepts": [{"name": "Same Concept", "definition": "A concept."}]
-            }),
+            content=json.dumps(
+                {"concepts": [{"name": "Same Concept", "definition": "A concept."}]}
+            ),
             success=True,
         )
 

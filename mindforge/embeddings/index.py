@@ -22,6 +22,7 @@ def _check_deps() -> bool:
         import faiss  # noqa: F401
         import numpy  # noqa: F401
         import sentence_transformers  # noqa: F401
+
         return True
     except ImportError:
         return False
@@ -49,6 +50,7 @@ class EmbeddingIndex:
     def _ensure_model(self) -> None:
         if self._model is None:
             from sentence_transformers import SentenceTransformer
+
             self._model = SentenceTransformer(self._model_name)
 
     def _concept_text(self, concept: Concept) -> str:

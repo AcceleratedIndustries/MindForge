@@ -19,6 +19,7 @@ from mindforge.utils.text import extract_keywords, normalize_whitespace
 @dataclass
 class RawConcept:
     """A candidate concept before distillation."""
+
     name: str
     raw_content: str
     source_chunks: list[str] = field(default_factory=list)  # chunk IDs
@@ -62,21 +63,81 @@ _TECH_TERM_PATTERNS = [
 
 # Generic words that should never be concepts on their own
 _BLOCKED_NAMES = {
-    "this", "that", "these", "those", "here", "there", "what", "which",
-    "how", "why", "when", "where", "who", "the", "key", "critical",
-    "important", "note", "meaning", "definition", "example", "examples",
-    "overview", "summary", "conclusion", "introduction", "section",
-    "part", "step", "result", "value", "type", "data", "system",
-    "method", "approach", "process", "model", "query", "search",
-    "token", "vector", "chunk", "generation", "retrieval", "semantic",
-    "attention", "it", "they", "its", "their", "for each new token generated",
-    "applications", "comparison", "popular options", "performance impact",
-    "memory considerations", "key insight", "advanced", "patterns",
-    "how it works", "how they are created", "why it matters",
-    "why embeddings matter", "why rag matters", "rag architecture",
-    "comparison with keyword search", "applications semantic search",
-    "advanced rag patterns", "ingestion pipeline", "query pipeline",
-    "indexing phase", "query phase", "cache", "documents",
+    "this",
+    "that",
+    "these",
+    "those",
+    "here",
+    "there",
+    "what",
+    "which",
+    "how",
+    "why",
+    "when",
+    "where",
+    "who",
+    "the",
+    "key",
+    "critical",
+    "important",
+    "note",
+    "meaning",
+    "definition",
+    "example",
+    "examples",
+    "overview",
+    "summary",
+    "conclusion",
+    "introduction",
+    "section",
+    "part",
+    "step",
+    "result",
+    "value",
+    "type",
+    "data",
+    "system",
+    "method",
+    "approach",
+    "process",
+    "model",
+    "query",
+    "search",
+    "token",
+    "vector",
+    "chunk",
+    "generation",
+    "retrieval",
+    "semantic",
+    "attention",
+    "it",
+    "they",
+    "its",
+    "their",
+    "for each new token generated",
+    "applications",
+    "comparison",
+    "popular options",
+    "performance impact",
+    "memory considerations",
+    "key insight",
+    "advanced",
+    "patterns",
+    "how it works",
+    "how they are created",
+    "why it matters",
+    "why embeddings matter",
+    "why rag matters",
+    "rag architecture",
+    "comparison with keyword search",
+    "applications semantic search",
+    "advanced rag patterns",
+    "ingestion pipeline",
+    "query pipeline",
+    "indexing phase",
+    "query phase",
+    "cache",
+    "documents",
 }
 
 
@@ -109,10 +170,30 @@ def _is_valid_concept_name(name: str) -> bool:
 
     # Names starting with verbs/prepositions are usually sentence fragments
     fragment_starters = {
-        "it", "this", "that", "there", "here", "with", "without",
-        "for", "from", "into", "about", "also", "each", "every",
-        "some", "any", "all", "both", "most", "more", "less",
-        "llms", "using", "based",
+        "it",
+        "this",
+        "that",
+        "there",
+        "here",
+        "with",
+        "without",
+        "for",
+        "from",
+        "into",
+        "about",
+        "also",
+        "each",
+        "every",
+        "some",
+        "any",
+        "all",
+        "both",
+        "most",
+        "more",
+        "less",
+        "llms",
+        "using",
+        "based",
     }
     if words[0] in fragment_starters:
         return False
@@ -145,7 +226,7 @@ def _extract_definitions(text: str) -> list[RawConcept]:
 
             # Capture surrounding context (up to 500 chars after the match)
             context_end = min(match.end() + 500, len(text))
-            after_context = text[match.end():context_end].strip()
+            after_context = text[match.end() : context_end].strip()
 
             # Build raw content: the full match sentence + surrounding context
             full_sentence = normalize_whitespace(match.group(0))
@@ -153,12 +234,14 @@ def _extract_definitions(text: str) -> list[RawConcept]:
             if after_context:
                 full_content += "\n\n" + after_context
 
-            concepts.append(RawConcept(
-                name=name,
-                raw_content=full_content[:2000],
-                extraction_method="definition_pattern",
-                confidence=0.8,
-            ))
+            concepts.append(
+                RawConcept(
+                    name=name,
+                    raw_content=full_content[:2000],
+                    extraction_method="definition_pattern",
+                    confidence=0.8,
+                )
+            )
 
     return concepts
 
@@ -188,12 +271,14 @@ def _extract_from_headings(text: str, full_text: str) -> list[RawConcept]:
         content = match.group(1).strip() if match else ""
 
         if len(content) > 20:
-            concepts.append(RawConcept(
-                name=name,
-                raw_content=content[:2000],
-                extraction_method="heading",
-                confidence=0.7,
-            ))
+            concepts.append(
+                RawConcept(
+                    name=name,
+                    raw_content=content[:2000],
+                    extraction_method="heading",
+                    confidence=0.7,
+                )
+            )
 
     return concepts
 
@@ -227,14 +312,16 @@ def _extract_keyword_concepts(chunks: list[Chunk]) -> list[RawConcept]:
             key=lambda c: c.content.lower().count(keyword),
         )
 
-        concepts.append(RawConcept(
-            name=name,
-            raw_content=best_chunk.content[:2000],
-            source_chunks=[c.id for c in kw_chunks],
-            source_files=list({c.source_file for c in kw_chunks}),
-            extraction_method="keyword_frequency",
-            confidence=min(0.4 + len(kw_chunks) * 0.1, 0.8),
-        ))
+        concepts.append(
+            RawConcept(
+                name=name,
+                raw_content=best_chunk.content[:2000],
+                source_chunks=[c.id for c in kw_chunks],
+                source_files=list({c.source_file for c in kw_chunks}),
+                extraction_method="keyword_frequency",
+                confidence=min(0.4 + len(kw_chunks) * 0.1, 0.8),
+            )
+        )
 
     return concepts
 

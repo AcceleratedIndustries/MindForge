@@ -36,8 +36,10 @@ def test_defaults():
 def test_snippet_is_capped_on_init():
     long = "x" * 5000
     ref = SourceRef(
-        transcript_path="t.md", transcript_hash="h",
-        turn_indices=[0], extracted_at="2025-01-01T00:00:00Z",
+        transcript_path="t.md",
+        transcript_hash="h",
+        turn_indices=[0],
+        extracted_at="2025-01-01T00:00:00Z",
         snippet=long,
     )
     assert len(ref.snippet) == SNIPPET_MAX_CHARS
@@ -48,10 +50,14 @@ def test_concept_roundtrip_preserves_sources():
         name="KV Cache",
         definition="d",
         explanation="e",
-        sources=[SourceRef(
-            transcript_path="t.md", transcript_hash="h",
-            turn_indices=[0], extracted_at="2025-01-01T00:00:00Z",
-        )],
+        sources=[
+            SourceRef(
+                transcript_path="t.md",
+                transcript_hash="h",
+                turn_indices=[0],
+                extracted_at="2025-01-01T00:00:00Z",
+            )
+        ],
     )
     restored = Concept.from_dict(c.to_dict())
     assert restored.sources == c.sources
@@ -59,8 +65,10 @@ def test_concept_roundtrip_preserves_sources():
 
 def test_concept_merge_dedups_sources():
     ref = SourceRef(
-        transcript_path="t.md", transcript_hash="h",
-        turn_indices=[0], extracted_at="2025-01-01T00:00:00Z",
+        transcript_path="t.md",
+        transcript_hash="h",
+        turn_indices=[0],
+        extracted_at="2025-01-01T00:00:00Z",
     )
     a = Concept(name="X", definition="d", explanation="e", sources=[ref])
     b = Concept(name="X", definition="d", explanation="e", sources=[ref])

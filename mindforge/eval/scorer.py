@@ -50,10 +50,7 @@ def score_concepts(expected: list[dict], actual: list[dict]) -> dict:
     phrases = [p for e, _ in matched_pairs for p in e.get("key_phrases", [])]
     if phrases:
         grounded = [
-            p
-            for e, m in matched_pairs
-            for p in e.get("key_phrases", [])
-            if _phrase_found(p, m)
+            p for e, m in matched_pairs for p in e.get("key_phrases", []) if _phrase_found(p, m)
         ]
         phrase_grounding = len(grounded) / len(phrases)
     else:

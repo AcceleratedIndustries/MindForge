@@ -31,6 +31,7 @@ def review_loop(
 
     if half_life_days is None:
         from mindforge.hygiene.decay import DEFAULT_HALF_LIFE_DAYS
+
         half_life_days = DEFAULT_HALF_LIFE_DAYS
 
     queue = build_review_queue(store, half_life_days=half_life_days)

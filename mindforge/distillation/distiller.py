@@ -45,14 +45,16 @@ def _build_source_refs(
             h = ""
         turn_indices = sorted({c.turn_index for c in chunks})
         snippet = chunks[0].content if chunks else None
-        refs.append(SourceRef(
-            transcript_path=source_file,
-            transcript_hash=h,
-            turn_indices=turn_indices,
-            extracted_at=now,
-            chunk_id=chunks[0].id if chunks else None,
-            snippet=snippet,
-        ))
+        refs.append(
+            SourceRef(
+                transcript_path=source_file,
+                transcript_hash=h,
+                turn_indices=turn_indices,
+                extracted_at=now,
+                chunk_id=chunks[0].id if chunks else None,
+                snippet=snippet,
+            )
+        )
     return refs
 
 
@@ -139,19 +141,23 @@ def _build_definition(name: str, sentences: list[str], raw: str) -> str:
     for sentence in sentences:
         s_lower = sentence.lower()
         # Look for definitional patterns
-        if any(
-            p in s_lower
-            for p in [
-                f"{name_lower} is",
-                f"{name_lower} are",
-                f"{name_lower} refers",
-                f"{name_lower} means",
-                f"{name_lower} describes",
-                f"{name_lower} represents",
-                f"{name_lower} provides",
-                f"{name_lower} enables",
-            ]
-        ) or name_lower in s_lower and len(defining_sentences) < 3:
+        if (
+            any(
+                p in s_lower
+                for p in [
+                    f"{name_lower} is",
+                    f"{name_lower} are",
+                    f"{name_lower} refers",
+                    f"{name_lower} means",
+                    f"{name_lower} describes",
+                    f"{name_lower} represents",
+                    f"{name_lower} provides",
+                    f"{name_lower} enables",
+                ]
+            )
+            or name_lower in s_lower
+            and len(defining_sentences) < 3
+        ):
             defining_sentences.append(sentence)
 
     if defining_sentences:
@@ -222,9 +228,20 @@ def _extract_insights(text: str, definition: str = "") -> list[str]:
 
     # Extract sentences with key phrases
     key_phrases = [
-        "important", "key", "critical", "essential", "note that",
-        "remember", "crucial", "significant", "advantage", "benefit",
-        "drawback", "limitation", "trade-off", "tradeoff",
+        "important",
+        "key",
+        "critical",
+        "essential",
+        "note that",
+        "remember",
+        "crucial",
+        "significant",
+        "advantage",
+        "benefit",
+        "drawback",
+        "limitation",
+        "trade-off",
+        "tradeoff",
     ]
     for sentence in extract_sentences(text):
         s_lower = sentence.lower()

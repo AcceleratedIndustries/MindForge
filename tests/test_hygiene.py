@@ -26,18 +26,25 @@ def _iso(days_ago: int) -> str:
 
 def test_concept_hygiene_roundtrip():
     c = Concept(
-        name="X", definition="d", explanation="e",
+        name="X",
+        definition="d",
+        explanation="e",
         status="conflicted",
-        conflicts=[ConflictMarker(field="definition", variants=[
-            ConflictVariant(
-                source=SourceRef("t.md", "h", [0], "2025-01-01T00:00:00Z"),
-                text="A",
-            ),
-            ConflictVariant(
-                source=SourceRef("t2.md", "h2", [1], "2025-01-02T00:00:00Z"),
-                text="B",
-            ),
-        ])],
+        conflicts=[
+            ConflictMarker(
+                field="definition",
+                variants=[
+                    ConflictVariant(
+                        source=SourceRef("t.md", "h", [0], "2025-01-01T00:00:00Z"),
+                        text="A",
+                    ),
+                    ConflictVariant(
+                        source=SourceRef("t2.md", "h2", [1], "2025-01-02T00:00:00Z"),
+                        text="B",
+                    ),
+                ],
+            )
+        ],
         last_reinforced_at="2025-01-03T00:00:00Z",
     )
     restored = Concept.from_dict(c.to_dict())
@@ -122,12 +129,16 @@ def test_orphan_enters_queue():
 
 def test_stale_enters_queue():
     store = ConceptStore()
-    store.add(Concept(
-        name="Z", definition="d", explanation="e",
-        confidence=0.2,
-        last_reinforced_at=_iso(200),
-        source_files=["t.md"],
-    ))
+    store.add(
+        Concept(
+            name="Z",
+            definition="d",
+            explanation="e",
+            confidence=0.2,
+            last_reinforced_at=_iso(200),
+            source_files=["t.md"],
+        )
+    )
     queue = build_review_queue(store)
     assert any(item["reason"] == "stale" for item in queue)
 

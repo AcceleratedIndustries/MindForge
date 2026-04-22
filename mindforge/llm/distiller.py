@@ -50,14 +50,17 @@ def _extract_embedded_relationships(text: str, source_slug: str) -> list[Relatio
 
         # Slugify the target for the relationship
         from mindforge.utils.text import slugify
+
         target_slug = slugify(target_name)
 
-        relationships.append(Relationship(
-            source=source_slug,
-            target=target_slug,
-            rel_type=rel_type,
-            confidence=0.85,
-        ))
+        relationships.append(
+            Relationship(
+                source=source_slug,
+                target=target_slug,
+                rel_type=rel_type,
+                confidence=0.85,
+            )
+        )
 
     return relationships
 
@@ -98,9 +101,7 @@ def distill_llm_concept(
     source_slug = slugify(raw.name)
     relationships = _extract_embedded_relationships(raw.raw_content, source_slug)
     embedded_tags = _extract_embedded_tags(raw.raw_content)
-    link_targets = list(dict.fromkeys(
-        r.target for r in relationships
-    ))
+    link_targets = list(dict.fromkeys(r.target for r in relationships))
     link_names = []
     for match in _REL_PATTERN.finditer(raw.raw_content):
         link_names.append(match.group(2).strip())

@@ -54,10 +54,7 @@ def ensure_structure():
             "version": "1.0",
             "kbs": {},
             "trash": {},
-            "settings": {
-                "default_kb": None,
-                "naming_convention": "kebab-case"
-            }
+            "settings": {"default_kb": None, "naming_convention": "kebab-case"},
         }
         REGISTRY_FILE.write_text(json.dumps(registry, indent=2))
 
@@ -80,7 +77,7 @@ def kebab_case(name: str) -> str:
 
 class KnowledgeBase:
     """Wrapper for a single Knowledge Base."""
-    
+
     def __init__(self, kb_id: str, path: Path):
         self.kb_id = kb_id
         self.path = path
@@ -89,12 +86,12 @@ class KnowledgeBase:
         self.graph: KnowledgeGraph | None = None
         self.query_engine: QueryEngine | None = None
         self._loaded = False
-    
+
     def load(self) -> bool:
         """Load this KB from disk."""
         if self._loaded:
             return True
-            
+
         manifest = self.path / "concepts.json"
         if manifest.exists():
             try:
@@ -104,18 +101,18 @@ class KnowledgeBase:
                 self.store = ConceptStore()
         else:
             self.store = ConceptStore()
-        
+
         graph_file = self.path / "graph.json"
         if graph_file.exists():
             try:
                 self.graph = KnowledgeGraph.load(graph_file)
             except Exception as e:
                 print(f"Error loading graph: {e}", file=sys.stderr)
-        
+
         self.query_engine = QueryEngine(self.store, self.graph, None)
         self._loaded = True
         return True
-    
+
     def get_stats(self) -> dict:
         """Get statistics for this KB."""
         self.load()
@@ -134,18 +131,18 @@ class KnowledgeBase:
 
 class MultiKBManager:
     """Manages multiple knowledge bases and the active selection."""
-    
+
     def __init__(self):
         ensure_structure()
         self.registry = load_registry()
         self.active_kb_id: str | None = None
         self.active_kb: KnowledgeBase | None = None
-        
+
         # Try to load last active from environment or session
         self.active_kb_id = os.environ.get("MINDFORGE_ACTIVE_KB")
         if self.active_kb_id and self.active_kb_id in self.registry["kbs"]:
             self._load_active()
-    
+
     def _load_active(self):
         """Load the active KB."""
         if not self.active_kb_id:
@@ -154,7 +151,7 @@ class MultiKBManager:
         if kb_info:
             self.active_kb = KnowledgeBase(self.active_kb_id, KBS_DIR / self.active_kb_id)
             self.active_kb.load()
-    
+
     def list_kbs(self) -> list[dict]:
         """List all available KBs."""
         result = []
@@ -169,28 +166,28 @@ class MultiKBManager:
                 "created_at": info.get("created_at", ""),
                 "updated_at": info.get("updated_at", ""),
                 "concept_count": stats["concept_count"],
-                "is_active": kb_id == self.active_kb_id
+                "is_active": kb_id == self.active_kb_id,
             }
             result.append(entry)
         return result
-    
+
     def create_kb(self, name: str, description: str = "", author: str = "") -> dict:
         """Create a new knowledge base."""
         kb_id = kebab_case(name)
-        
+
         if kb_id in self.registry["kbs"]:
             return {"success": False, "error": f"KB '{kb_id}' already exists"}
-        
+
         # Create directory structure
         kb_path = KBS_DIR / kb_id
         kb_path.mkdir(parents=True, exist_ok=True)
         (kb_path / "concepts").mkdir(exist_ok=True)
-        
+
         # Initialize empty files
         empty_store = ConceptStore()
         empty_store.save(kb_path / "concepts.json")
         open(kb_path / "graph.json", "w").write('{"nodes": [], "edges": []}')
-        
+
         # Add to registry
         now = datetime.now().isoformat()
         self.registry["kbs"][kb_id] = {
@@ -199,103 +196,103 @@ class MultiKBManager:
             "author": author,
             "path": f"kbs/{kb_id}",
             "created_at": now,
-            "updated_at": now
+            "updated_at": now,
         }
         save_registry(self.registry)
-        
+
         return {"success": True, "id": kb_id, "path": str(kb_path)}
-    
+
     def select_kb(self, kb_id: str) -> dict:
         """Select (activate) a knowledge base."""
         if kb_id not in self.registry["kbs"]:
             return {"success": False, "error": f"KB '{kb_id}' not found"}
-        
+
         self.active_kb_id = kb_id
         self._load_active()
-        
+
         # Update process env for persistence
         os.environ["MINDFORGE_ACTIVE_KB"] = kb_id
-        
+
         if self.active_kb:
             stats = self.active_kb.get_stats()
             return {
                 "success": True,
                 "id": kb_id,
                 "name": self.registry["kbs"][kb_id]["name"],
-                "concept_count": stats["concept_count"]
+                "concept_count": stats["concept_count"],
             }
         return {"success": False, "error": "Failed to load KB"}
-    
+
     def delete_kb(self, kb_id: str) -> dict:
         """Move a KB to trash."""
         if kb_id not in self.registry["kbs"]:
             return {"success": False, "error": f"KB '{kb_id}' not found"}
-        
+
         kb_info = self.registry["kbs"][kb_id]
         kb_path = KBS_DIR / kb_id
-        
+
         # Move to trash with timestamp
         trashed_name = f"{kb_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         trashed_path = TRASH_DIR / trashed_name
-        
+
         try:
             shutil.move(str(kb_path), str(trashed_path))
-            
+
             # Update registry
             kb_info["deleted_at"] = datetime.now().isoformat()
             self.registry["trash"][trashed_name] = kb_info
             del self.registry["kbs"][kb_id]
-            
+
             # Clear active if needed
             if self.active_kb_id == kb_id:
                 self.active_kb = None
                 self.active_kb_id = None
                 os.environ.pop("MINDFORGE_ACTIVE_KB", None)
-            
+
             save_registry(self.registry)
             return {"success": True, "trashed": trashed_name}
         except Exception as e:
             return {"success": False, "error": str(e)}
-    
+
     def rename_kb(self, old_id: str, new_name: str) -> dict:
         """Rename a knowledge base."""
         if old_id not in self.registry["kbs"]:
             return {"success": False, "error": f"KB '{old_id}' not found"}
-        
+
         new_id = kebab_case(new_name)
         if new_id != old_id and new_id in self.registry["kbs"]:
             return {"success": False, "error": f"KB '{new_id}' already exists"}
-        
+
         old_path = KBS_DIR / old_id
         new_path = KBS_DIR / new_id
-        
+
         try:
             shutil.move(str(old_path), str(new_path))
-            
+
             # Update registry
             kb_info = self.registry["kbs"][old_id]
             kb_info["name"] = new_name
             kb_info["path"] = f"kbs/{new_id}"
             kb_info["updated_at"] = datetime.now().isoformat()
-            
+
             del self.registry["kbs"][old_id]
             self.registry["kbs"][new_id] = kb_info
-            
+
             # Update active if needed
             if self.active_kb_id == old_id:
                 self.active_kb_id = new_id
                 os.environ["MINDFORGE_ACTIVE_KB"] = new_id
-            
+
             save_registry(self.registry)
             return {"success": True, "old_id": old_id, "new_id": new_id}
         except Exception as e:
             return {"success": False, "error": str(e)}
-    
+
     def get_current(self) -> dict | None:
         """Get info about the current active KB."""
         if not self.active_kb_id or not self.active_kb:
             return None
-        
+
         info = self.registry["kbs"].get(self.active_kb_id, {})
         stats = self.active_kb.get_stats()
         return {
@@ -304,9 +301,9 @@ class MultiKBManager:
             "description": info.get("description", ""),
             "concept_count": stats["concept_count"],
             "graph_nodes": stats.get("graph_nodes", 0),
-            "graph_edges": stats.get("graph_edges", 0)
+            "graph_edges": stats.get("graph_edges", 0),
         }
-    
+
     def require_active(self) -> KnowledgeBase:
         """Get active KB or raise error."""
         if not self.active_kb:
@@ -319,6 +316,7 @@ app = Server("mindforge")
 
 # Global multi-KB manager
 _manager: MultiKBManager | None = None
+
 
 def get_manager() -> MultiKBManager:
     global _manager
@@ -548,6 +546,7 @@ ALL_TOOLS = KB_TOOLS + SEARCH_TOOLS + CONCEPT_TOOLS
 
 # --- Helper Functions ---
 
+
 def _resolve_slug(store, name: str) -> str:
     """Resolve a concept name or slug."""
     slug = slugify(name)
@@ -561,64 +560,64 @@ def _resolve_slug(store, name: str) -> str:
 
 # --- Tool Handlers ---
 
+
 @app.call_tool()
-async def handle_tool(name: str, arguments: dict) -> list[TextContent | ImageContent | EmbeddedResource]:
+async def handle_tool(
+    name: str, arguments: dict
+) -> list[TextContent | ImageContent | EmbeddedResource]:
     """Handle MCP tool calls."""
     manager = get_manager()
-    
+
     # --- KB Management Tools ---
-    
+
     if name == "kb_list":
         kbs = manager.list_kbs()
         return [TextContent(type="text", text=json.dumps(kbs, indent=2))]
-    
+
     elif name == "kb_create":
         result = manager.create_kb(
             name=arguments.get("name", ""),
             description=arguments.get("description", ""),
-            author=arguments.get("author", "")
+            author=arguments.get("author", ""),
         )
         return [TextContent(type="text", text=json.dumps(result, indent=2))]
-    
+
     elif name == "kb_select":
         result = manager.select_kb(arguments.get("id", ""))
         return [TextContent(type="text", text=json.dumps(result, indent=2))]
-    
+
     elif name == "kb_delete":
         result = manager.delete_kb(arguments.get("id", ""))
         return [TextContent(type="text", text=json.dumps(result, indent=2))]
-    
+
     elif name == "kb_rename":
-        result = manager.rename_kb(
-            arguments.get("old_id", ""),
-            arguments.get("new_name", "")
-        )
+        result = manager.rename_kb(arguments.get("old_id", ""), arguments.get("new_name", ""))
         return [TextContent(type="text", text=json.dumps(result, indent=2))]
-    
+
     elif name == "kb_get_current":
         current = manager.get_current()
         if current is None:
             return [TextContent(type="text", text="No knowledge base selected.")]
         return [TextContent(type="text", text=json.dumps(current, indent=2))]
-    
+
     # --- Search Tools ---
-    
+
     elif name == "search":
         try:
             kb = manager.require_active()
         except RuntimeError as e:
             return [TextContent(type="text", text=str(e))]
-        
+
         query = arguments.get("query", "")
         top_k = arguments.get("top_k", 5)
-        
+
         if not kb.query_engine:
             return [TextContent(type="text", text="Query engine not available.")]
-        
+
         results = kb.query_engine.search(query, top_k=top_k)
         if not results:
             return [TextContent(type="text", text=f"No results found in active KB for: {query}")]
-        
+
         output = []
         for r in results:
             entry = {
@@ -631,16 +630,16 @@ async def handle_tool(name: str, arguments: dict) -> list[TextContent | ImageCon
             }
             output.append(entry)
         return [TextContent(type="text", text=json.dumps(output, indent=2))]
-    
+
     elif name == "search_all":
         query = arguments.get("query", "")
         top_k = arguments.get("top_k", 5)
-        
+
         all_results = []
         for kb_id in manager.registry["kbs"].keys():
             kb = KnowledgeBase(kb_id, KBS_DIR / kb_id)
             kb.load()
-            
+
             if kb.query_engine:
                 results = kb.query_engine.search(query, top_k=top_k)
                 for r in results:
@@ -650,30 +649,32 @@ async def handle_tool(name: str, arguments: dict) -> list[TextContent | ImageCon
                         "name": r.concept.name,
                         "slug": r.concept.slug,
                         "score": round(r.score, 3),
-                        "definition": r.concept.definition[:200] + "..." if len(r.concept.definition) > 200 else r.concept.definition,
+                        "definition": r.concept.definition[:200] + "..."
+                        if len(r.concept.definition) > 200
+                        else r.concept.definition,
                     }
                     all_results.append(entry)
-        
+
         if not all_results:
             return [TextContent(type="text", text=f"No results found in any KB for: {query}")]
-        
+
         # Sort by score
         all_results.sort(key=lambda x: x["score"], reverse=True)
         return [TextContent(type="text", text=json.dumps(all_results[:20], indent=2))]
-    
+
     elif name == "search_selected":
         query = arguments.get("query", "")
         kb_ids = arguments.get("kb_ids", [])
         top_k = arguments.get("top_k", 5)
-        
+
         all_results = []
         for kb_id in kb_ids:
             if kb_id not in manager.registry["kbs"]:
                 continue
-                
+
             kb = KnowledgeBase(kb_id, KBS_DIR / kb_id)
             kb.load()
-            
+
             if kb.query_engine:
                 results = kb.query_engine.search(query, top_k=top_k)
                 for r in results:
@@ -683,31 +684,33 @@ async def handle_tool(name: str, arguments: dict) -> list[TextContent | ImageCon
                         "name": r.concept.name,
                         "slug": r.concept.slug,
                         "score": round(r.score, 3),
-                        "definition": r.concept.definition[:200] + "..." if len(r.concept.definition) > 200 else r.concept.definition,
+                        "definition": r.concept.definition[:200] + "..."
+                        if len(r.concept.definition) > 200
+                        else r.concept.definition,
                     }
                     all_results.append(entry)
-        
+
         if not all_results:
             return [TextContent(type="text", text=f"No results found in selected KBs for: {query}")]
-        
+
         all_results.sort(key=lambda x: x["score"], reverse=True)
         return [TextContent(type="text", text=json.dumps(all_results[:20], indent=2))]
-    
+
     # --- Concept Tools (require active KB) ---
-    
+
     elif name == "get_concept":
         try:
             kb = manager.require_active()
         except RuntimeError as e:
             return [TextContent(type="text", text=str(e))]
-        
+
         name_arg = arguments.get("name", "")
         slug = _resolve_slug(kb.store, name_arg) if kb.store else name_arg
         concept = kb.store.get(slug) if kb.store else None
-        
+
         if not concept:
             return [TextContent(type="text", text=f"Concept not found: {name_arg}")]
-        
+
         data = {
             "name": concept.name,
             "slug": concept.slug,
@@ -719,94 +722,97 @@ async def handle_tool(name: str, arguments: dict) -> list[TextContent | ImageCon
             "confidence": concept.confidence,
             "links": concept.links,
             "relationships": [
-                {"target": r.target, "type": r.rel_type.value}
-                for r in concept.relationships
+                {"target": r.target, "type": r.rel_type.value} for r in concept.relationships
             ],
             "sources": [s.to_dict() for s in concept.sources],
         }
         return [TextContent(type="text", text=json.dumps(data, indent=2))]
-    
+
     elif name == "list_concepts":
         try:
             kb = manager.require_active()
         except RuntimeError as e:
             return [TextContent(type="text", text=str(e))]
-        
+
         tag_filter = arguments.get("tag", "")
         concepts = kb.store.all() if kb.store else []
-        
+
         if tag_filter:
             tag_lower = tag_filter.lower()
             concepts = [c for c in concepts if tag_lower in [t.lower() for t in c.tags]]
-        
+
         entries = []
         for c in sorted(concepts, key=lambda x: x.confidence, reverse=True):
-            entries.append({
-                "name": c.name,
-                "slug": c.slug,
-                "confidence": c.confidence,
-                "tags": c.tags,
-            })
-        
+            entries.append(
+                {
+                    "name": c.name,
+                    "slug": c.slug,
+                    "confidence": c.confidence,
+                    "tags": c.tags,
+                }
+            )
+
         return [TextContent(type="text", text=json.dumps(entries, indent=2))]
-    
+
     elif name == "get_neighbors":
         try:
             kb = manager.require_active()
         except RuntimeError as e:
             return [TextContent(type="text", text=str(e))]
-        
+
         name_arg = arguments.get("name", "")
         slug = _resolve_slug(kb.store, name_arg) if kb.store else name_arg
         concept = kb.store.get(slug) if kb.store else None
-        
+
         if not concept:
             return [TextContent(type="text", text=f"Concept not found: {name_arg}")]
-        
+
         neighbors = []
         if kb.graph:
             neighbor_slugs = kb.graph.neighbors(slug)
             for ns in neighbor_slugs:
                 nc = kb.store.get(ns) if kb.store else None
                 if nc:
-                    neighbors.append({
-                        "name": nc.name,
-                        "slug": nc.slug,
-                        "definition": nc.definition[:150],
-                    })
-        
+                    neighbors.append(
+                        {
+                            "name": nc.name,
+                            "slug": nc.slug,
+                            "definition": nc.definition[:150],
+                        }
+                    )
+
         relationships = [
             {"target": r.target, "type": r.rel_type.value, "confidence": r.confidence}
             for r in concept.relationships
         ]
-        
+
         data = {
             "concept": concept.name,
             "neighbors": neighbors,
             "relationships": relationships,
         }
         return [TextContent(type="text", text=json.dumps(data, indent=2))]
-    
+
     elif name == "get_stats":
         try:
             kb = manager.require_active()
         except RuntimeError as e:
             return [TextContent(type="text", text=str(e))]
-        
+
         current = manager.get_current()
         concepts = kb.store.all() if kb.store else []
-        
+
         stats: dict = {
             "kb_id": current["id"] if current else None,
             "kb_name": current["name"] if current else None,
             "total_concepts": len(concepts),
         }
-        
+
         if concepts:
             stats["avg_confidence"] = round(sum(c.confidence for c in concepts) / len(concepts), 2)
             stats["total_insights"] = sum(len(c.insights) for c in concepts)
             stats["total_links"] = sum(len(c.links) for c in concepts)
-        
+
         if kb.graph:
             graph_stats = kb.graph.stats()
             stats["graph_nodes"] = graph_stats.get("nodes", 0)
@@ -814,16 +820,18 @@ async def handle_tool(name: str, arguments: dict) -> list[TextContent | ImageCon
             stats["graph_clusters"] = graph_stats.get("clusters", 0)
             if "density" in graph_stats:
                 stats["graph_density"] = graph_stats["density"]
-            
+
             top = kb.graph.central_concepts(top_n=5)
             if top:
                 central = []
                 for s, centrality in top:
                     c = kb.store.get(s) if kb.store else None
-                    central.append({
-                        "name": c.name if c else s,
-                        "centrality": round(centrality, 3),
-                    })
+                    central.append(
+                        {
+                            "name": c.name if c else s,
+                            "centrality": round(centrality, 3),
+                        }
+                    )
                 stats["most_central"] = central
 
         return [TextContent(type="text", text=json.dumps(stats, indent=2))]
@@ -839,7 +847,7 @@ async def handle_tool(name: str, arguments: dict) -> list[TextContent | ImageCon
             return [TextContent(type="text", text=json.dumps([]))]
         items = build_review_queue(kb.store)
         return [TextContent(type="text", text=json.dumps(items, indent=2))]
-    
+
     else:
         return [TextContent(type="text", text=f"Unknown tool: {name}")]
 
@@ -854,11 +862,7 @@ async def main():
     """Run the MCP server (async)."""
     get_manager()
     async with stdio_server() as (read_stream, write_stream):
-        await app.run(
-            read_stream,
-            write_stream,
-            app.create_initialization_options()
-        )
+        await app.run(read_stream, write_stream, app.create_initialization_options())
 
 
 class _ServerShim:
@@ -869,6 +873,7 @@ class _ServerShim:
 
     def run(self) -> None:
         import asyncio
+
         asyncio.run(main())
 
 
@@ -881,4 +886,5 @@ def create_server(config: MindForgeConfig | None = None) -> _ServerShim:
 
 if __name__ == "__main__":
     import asyncio
+
     asyncio.run(main())

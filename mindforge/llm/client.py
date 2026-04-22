@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class LLMConfig:
     """Configuration for the LLM client."""
+
     provider: str = "ollama"  # "ollama" or "openai"
     model: str = "llama3.2"
     base_url: str = ""  # Auto-set based on provider if empty
@@ -39,6 +40,7 @@ class LLMConfig:
 @dataclass
 class LLMResponse:
     """A response from the LLM."""
+
     content: str
     model: str = ""
     prompt_tokens: int = 0
@@ -144,13 +146,15 @@ class LLMClient:
             error_body = e.read().decode("utf-8", errors="replace")
             logger.error("LLM HTTP error %d: %s", e.code, error_body[:500])
             return LLMResponse(
-                content="", success=False,
+                content="",
+                success=False,
                 error=f"HTTP {e.code}: {error_body[:200]}",
             )
         except (urllib.error.URLError, OSError, TimeoutError) as e:
             logger.error("LLM connection error: %s", e)
             return LLMResponse(
-                content="", success=False,
+                content="",
+                success=False,
                 error=f"Connection error: {e}",
             )
 

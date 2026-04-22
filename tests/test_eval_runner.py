@@ -33,7 +33,7 @@ def test_runner_produces_report(tmp_path: Path):
         "expected_concepts:\n"
         "  - name: KV Cache\n"
         "    slug: kv-cache\n"
-        "    key_phrases: [\"Key and Value\"]\n"
+        '    key_phrases: ["Key and Value"]\n'
         "expected_relationships: []\n",
     )
 

@@ -29,18 +29,22 @@ class TestInsertWikiLinks:
 class TestDetectLinks:
     def test_name_mention_creates_link(self):
         store = ConceptStore()
-        store.add(Concept(
-            name="Vector Embeddings",
-            definition="Dense numerical representations of data.",
-            explanation="Used for similarity search.",
-            tags=["ml", "vectors"],
-        ))
-        store.add(Concept(
-            name="Semantic Search",
-            definition="Search that uses Vector Embeddings to find similar items.",
-            explanation="Relies on dense vectors for matching.",
-            tags=["search", "vectors"],
-        ))
+        store.add(
+            Concept(
+                name="Vector Embeddings",
+                definition="Dense numerical representations of data.",
+                explanation="Used for similarity search.",
+                tags=["ml", "vectors"],
+            )
+        )
+        store.add(
+            Concept(
+                name="Semantic Search",
+                definition="Search that uses Vector Embeddings to find similar items.",
+                explanation="Relies on dense vectors for matching.",
+                tags=["search", "vectors"],
+            )
+        )
 
         detect_links(store, confidence_threshold=0.2)
 
@@ -49,12 +53,14 @@ class TestDetectLinks:
 
     def test_no_self_links(self):
         store = ConceptStore()
-        store.add(Concept(
-            name="Test",
-            definition="Test is a test concept about testing.",
-            explanation="Testing the test.",
-            tags=["test"],
-        ))
+        store.add(
+            Concept(
+                name="Test",
+                definition="Test is a test concept about testing.",
+                explanation="Testing the test.",
+                tags=["test"],
+            )
+        )
 
         detect_links(store)
 

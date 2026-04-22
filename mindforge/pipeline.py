@@ -34,11 +34,17 @@ def _write_all_provenance(concepts, provenance_dir: Path) -> int:
         if not concept.sources:
             continue
         path = provenance_dir / f"{concept.slug}.json"
-        path.write_text(json.dumps({
-            "slug": concept.slug,
-            "name": concept.name,
-            "sources": [s.to_dict() for s in concept.sources],
-        }, indent=2), encoding="utf-8")
+        path.write_text(
+            json.dumps(
+                {
+                    "slug": concept.slug,
+                    "name": concept.name,
+                    "sources": [s.to_dict() for s in concept.sources],
+                },
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
         count += 1
     return count
 
@@ -46,6 +52,7 @@ def _write_all_provenance(concepts, provenance_dir: Path) -> int:
 @dataclass
 class PipelineResult:
     """Result of a pipeline run."""
+
     concepts_extracted: int
     concepts_after_dedup: int
     concept_files_written: int
@@ -131,6 +138,7 @@ class MindForgePipeline:
 
         # Stamp last_reinforced_at for hygiene bookkeeping.
         from datetime import datetime, timezone
+
         now_iso = datetime.now(timezone.utc).isoformat()
         for concept in self.store.all():
             concept.last_reinforced_at = now_iso
@@ -174,7 +182,9 @@ class MindForgePipeline:
 
         # Initialize query engine
         self.query_engine = QueryEngine(
-            self.store, self.graph, self.embedding_index,
+            self.store,
+            self.graph,
+            self.embedding_index,
         )
 
         # Save updated manifest (now with links)
@@ -230,8 +240,10 @@ class MindForgePipeline:
         # Also run heuristic extraction and merge (LLM may miss things
         # that pattern matching catches, and vice versa)
         heuristic_concepts = extract_concepts(chunks)
-        print(f"  LLM extracted {len(llm_concepts)} concepts, "
-              f"heuristic found {len(heuristic_concepts)}")
+        print(
+            f"  LLM extracted {len(llm_concepts)} concepts, "
+            f"heuristic found {len(heuristic_concepts)}"
+        )
 
         # Merge: LLM concepts take priority, then add unique heuristic ones
         seen_names = {c.name.lower() for c in llm_concepts}

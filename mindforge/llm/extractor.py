@@ -67,6 +67,7 @@ Respond with this exact JSON structure:
 @dataclass
 class ExtractionStats:
     """Track LLM extraction statistics."""
+
     chunks_processed: int = 0
     llm_calls: int = 0
     concepts_extracted: int = 0
@@ -150,14 +151,16 @@ def _parse_llm_concepts(
 
         raw_content = "\n\n".join(content_parts)
 
-        concepts.append(RawConcept(
-            name=name,
-            raw_content=raw_content[:5000],
-            source_chunks=source_chunks,
-            source_files=source_files,
-            extraction_method="llm",
-            confidence=0.9,  # LLM extraction gets high confidence
-        ))
+        concepts.append(
+            RawConcept(
+                name=name,
+                raw_content=raw_content[:5000],
+                source_chunks=source_chunks,
+                source_files=source_files,
+                extraction_method="llm",
+                confidence=0.9,  # LLM extraction gets high confidence
+            )
+        )
 
     return concepts
 
