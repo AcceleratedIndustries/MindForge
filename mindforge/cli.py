@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
+from typing import Any
 
 from mindforge.config import MindForgeConfig
 from mindforge.pipeline import MindForgePipeline
@@ -437,7 +438,7 @@ def compute_diff(manifest_path: Path, since: str | None = None) -> dict[str, lis
     if len(history) < 2:
         return {"added": [], "modified": [], "deleted": []}
     current = history[-1]
-    prior: dict
+    prior: dict[str, Any]
     if since:
         candidates = [h for h in history if h["timestamp"] >= since and h is not current]
         prior = candidates[0] if candidates else history[-2]

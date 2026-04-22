@@ -195,9 +195,7 @@ class MindForgePipeline:
                 for slug, c in self.store.concepts.items()
                 if slug in existing.concepts and existing.concepts[slug].hash == c.hash
             )
-            removed_count = sum(
-                1 for slug in existing.concepts if slug not in self.store.concepts
-            )
+            removed_count = sum(1 for slug in existing.concepts if slug not in self.store.concepts)
             return PipelineResult(
                 concepts_extracted=len(raw_concepts),
                 concepts_after_dedup=len(deduped),
