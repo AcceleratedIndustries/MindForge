@@ -31,7 +31,8 @@ def load_corpus(fixtures_dir: Path) -> list[Fixture]:
                 file=sys.stderr,
             )
             continue
-        data = yaml.safe_load(gt.read_text(encoding="utf-8")) or {}
+        raw = yaml.safe_load(gt.read_text(encoding="utf-8"))
+        data: dict[str, Any] = raw if isinstance(raw, dict) else {}
         fixtures.append(
             Fixture(
                 transcript_path=t,

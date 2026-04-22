@@ -71,6 +71,7 @@ class EmbeddingIndex:
         import numpy as np
 
         self._ensure_model()
+        assert self._model is not None  # narrowed by _ensure_model
 
         texts = [self._concept_text(c) for c in concepts]
         self._slugs = [c.slug for c in concepts]
@@ -88,6 +89,7 @@ class EmbeddingIndex:
 
         # Build FAISS index
         self._index = faiss.IndexFlatIP(self._dimension)
+        assert self._index is not None
         self._index.add(embeddings)
 
     def query(self, text: str, top_k: int = 5) -> list[tuple[str, float]]:

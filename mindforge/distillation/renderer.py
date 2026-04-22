@@ -38,8 +38,8 @@ def render_concept(concept: Concept) -> str:
     elif concept.source_files:
         # Legacy fallback when Concept.sources is empty.
         lines.append("sources:")
-        for src in concept.source_files:
-            lines.append(f'  - "{src}"')
+        for legacy in concept.source_files:
+            lines.append(f'  - "{legacy}"')
     lines.append("---")
     lines.append("")
 

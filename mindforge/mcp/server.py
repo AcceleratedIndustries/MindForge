@@ -24,7 +24,7 @@ from mcp.types import (
 )
 
 from mindforge.config import MindForgeConfig
-from mindforge.distillation.concept import ConceptStore
+from mindforge.distillation.concept import Concept, ConceptStore
 from mindforge.graph.builder import KnowledgeGraph
 from mindforge.mcp.adapter import get_adapter
 from mindforge.paths import MindForgePaths
@@ -121,7 +121,9 @@ class KnowledgeBase:
             "concept_count": len(concepts),
         }
         if concepts:
-            stats["avg_confidence"] = round(sum(c.confidence for c in concepts) / len(concepts), 2)
+            stats["avg_confidence"] = round(  # type: ignore[assignment]
+                sum(c.confidence for c in concepts) / len(concepts), 2
+            )
         if self.graph:
             graph_stats = self.graph.stats()
             stats["graph_nodes"] = graph_stats.get("nodes", 0)
@@ -467,8 +469,7 @@ SEARCH_TOOLS: list[Tool] = [
     Tool(
         name="search_selected",
         description=(
-            "Search SELECTED knowledge bases by ID. "
-            "Provide a list of KB IDs to search across."
+            "Search SELECTED knowledge bases by ID. Provide a list of KB IDs to search across."
         ),
         inputSchema={
             "type": "object",
@@ -524,8 +525,7 @@ CONCEPT_TOOLS: list[Tool] = [
     Tool(
         name="get_neighbors",
         description=(
-            "Get concepts related to a given concept via the knowledge graph "
-            "(from ACTIVE KB)."
+            "Get concepts related to a given concept via the knowledge graph (from ACTIVE KB)."
         ),
         inputSchema={
             "type": "object",
@@ -576,7 +576,7 @@ def _resolve_slug(store, name: str) -> str:
 # --- Tool Handlers ---
 
 
-@app.call_tool()
+@app.call_tool()  # type: ignore[untyped-decorator]
 async def handle_tool(
     name: str, arguments: dict
 ) -> list[TextContent | ImageContent | EmbeddedResource]:
@@ -674,7 +674,7 @@ async def handle_tool(
             return [TextContent(type="text", text=f"No results found in any KB for: {query}")]
 
         # Sort by score
-        all_results.sort(key=lambda x: x["score"], reverse=True)
+        all_results.sort(key=lambda x: x["score"], reverse=True)  # type: ignore[arg-type,return-value]
         return [TextContent(type="text", text=json.dumps(all_results[:20], indent=2))]
 
     elif name == "search_selected":
@@ -708,7 +708,7 @@ async def handle_tool(
         if not all_results:
             return [TextContent(type="text", text=f"No results found in selected KBs for: {query}")]
 
-        all_results.sort(key=lambda x: x["score"], reverse=True)
+        all_results.sort(key=lambda x: x["score"], reverse=True)  # type: ignore[arg-type,return-value]
         return [TextContent(type="text", text=json.dumps(all_results[:20], indent=2))]
 
     # --- Concept Tools (require active KB) ---
@@ -840,10 +840,10 @@ async def handle_tool(
             if top:
                 central = []
                 for s, centrality in top:
-                    c = kb.store.get(s) if kb.store else None
+                    concept_for_stat: Concept | None = kb.store.get(s) if kb.store else None
                     central.append(
                         {
-                            "name": c.name if c else s,
+                            "name": concept_for_stat.name if concept_for_stat else s,
                             "centrality": round(centrality, 3),
                         }
                     )
@@ -867,7 +867,7 @@ async def handle_tool(
         return [TextContent(type="text", text=f"Unknown tool: {name}")]
 
 
-@app.list_tools()
+@app.list_tools()  # type: ignore[untyped-decorator]
 async def list_tools() -> list[Tool]:
     """Return the list of available tools."""
     return ALL_TOOLS

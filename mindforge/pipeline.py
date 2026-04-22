@@ -11,12 +11,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from mindforge.config import MindForgeConfig
-from mindforge.distillation.concept import ConceptStore
+from mindforge.distillation.concept import Concept, ConceptStore
 from mindforge.distillation.deduplicator import deduplicate_concepts
 from mindforge.distillation.renderer import write_all_concepts
 from mindforge.embeddings.index import EmbeddingIndex
 from mindforge.graph.builder import KnowledgeGraph
-from mindforge.ingestion.chunker import chunk_turns
+from mindforge.ingestion.chunker import Chunk, chunk_turns
 from mindforge.ingestion.extractor import RawConcept, extract_concepts
 from mindforge.ingestion.parser import parse_all_transcripts
 from mindforge.linking.linker import detect_links
@@ -26,7 +26,7 @@ from mindforge.llm.extractor import extract_concepts_llm
 from mindforge.query.engine import QueryEngine
 
 
-def _write_all_provenance(concepts, provenance_dir: Path) -> int:
+def _write_all_provenance(concepts: list[Concept], provenance_dir: Path) -> int:
     """Write one provenance JSON per concept that has sources. Returns file count."""
     count = 0
     provenance_dir.mkdir(parents=True, exist_ok=True)
@@ -213,7 +213,7 @@ class MindForgePipeline:
 
     def _extract_with_llm(
         self,
-        chunks: list,
+        chunks: list[Chunk],
     ) -> tuple[list[RawConcept], str]:
         """Attempt LLM extraction, falling back to heuristic if unavailable.
 

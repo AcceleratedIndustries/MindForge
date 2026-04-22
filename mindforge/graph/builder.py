@@ -31,7 +31,7 @@ class KnowledgeGraph:
         self._edges: list[dict] = []
 
         if HAS_NETWORKX:
-            self._graph: nx.DiGraph = nx.DiGraph()
+            self._graph: nx.DiGraph | None = nx.DiGraph()
         else:
             self._graph = None
 

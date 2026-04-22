@@ -5,6 +5,7 @@ from __future__ import annotations
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 from mindforge.config import MindForgeConfig
 from mindforge.distillation.concept import ConceptStore
@@ -13,7 +14,7 @@ from mindforge.eval.scorer import score_concepts, score_relationships
 from mindforge.pipeline import MindForgePipeline
 
 
-def run_eval(fixtures_dir: Path, mode: str = "heuristic", **llm_kwargs) -> dict:
+def run_eval(fixtures_dir: Path, mode: str = "heuristic", **llm_kwargs: Any) -> dict[str, Any]:
     """Run the pipeline on a fixture directory and score against ground truth.
 
     ``mode`` is "heuristic" (default) or "llm". For LLM mode, pass
@@ -25,7 +26,7 @@ def run_eval(fixtures_dir: Path, mode: str = "heuristic", **llm_kwargs) -> dict:
 
     with tempfile.TemporaryDirectory() as tmp:
         out = Path(tmp) / "out"
-        cfg_kwargs = {
+        cfg_kwargs: dict[str, Any] = {
             "transcripts_dir": fixtures_dir,
             "output_dir": out,
             "use_llm": mode == "llm",
@@ -39,7 +40,7 @@ def run_eval(fixtures_dir: Path, mode: str = "heuristic", **llm_kwargs) -> dict:
 
         store = ConceptStore.load(out / "concepts.json")
         actual_concepts = [c.to_dict() for c in store.all()]
-        actual_rels: list[dict] = []
+        actual_rels: list[dict[str, Any]] = []
         for c in store.all():
             for r in c.relationships:
                 actual_rels.append(r.to_dict())
@@ -56,7 +57,7 @@ def run_eval(fixtures_dir: Path, mode: str = "heuristic", **llm_kwargs) -> dict:
     }
 
 
-def render_markdown(report: dict) -> str:
+def render_markdown(report: dict[str, Any]) -> str:
     if report.get("corpus_size", 0) == 0:
         return "MindForge Evaluation Report\n\n(no fixtures)\n"
     c = report["concepts"]
