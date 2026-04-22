@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 SNIPPET_MAX_CHARS = 500
 
@@ -20,7 +21,7 @@ class SourceRef:
         if self.snippet is not None and len(self.snippet) > SNIPPET_MAX_CHARS:
             self.snippet = self.snippet[:SNIPPET_MAX_CHARS]
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "transcript_path": self.transcript_path,
             "transcript_hash": self.transcript_hash,
@@ -31,7 +32,7 @@ class SourceRef:
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> SourceRef:
+    def from_dict(cls, data: dict[str, Any]) -> SourceRef:
         return cls(
             transcript_path=data["transcript_path"],
             transcript_hash=data["transcript_hash"],

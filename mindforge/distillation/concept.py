@@ -6,6 +6,7 @@ import json
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
+from typing import Any
 
 from mindforge.distillation.source_ref import SourceRef
 
@@ -39,7 +40,7 @@ class Relationship:
     rel_type: RelationshipType
     confidence: float = 1.0
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "source": self.source,
             "target": self.target,
@@ -48,7 +49,7 @@ class Relationship:
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> Relationship:
+    def from_dict(cls, data: dict[str, Any]) -> Relationship:
         return cls(
             source=data["source"],
             target=data["target"],
@@ -85,7 +86,7 @@ class Concept:
     def hash(self) -> str:
         return content_hash(f"{self.name}:{self.definition}")
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "slug": self.slug,
@@ -106,7 +107,7 @@ class Concept:
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> Concept:
+    def from_dict(cls, data: dict[str, Any]) -> Concept:
         rels = [Relationship.from_dict(r) for r in data.get("relationships", [])]
         sources = [SourceRef.from_dict(s) for s in data.get("sources", [])]
         conflicts = [ConflictMarker.from_dict(c) for c in data.get("conflicts", [])]
@@ -136,7 +137,7 @@ class Concept:
         merged_sources = list(dict.fromkeys(self.source_files + other.source_files))
 
         # Dedup SourceRef list by (transcript_path, transcript_hash, turn_indices).
-        seen: set[tuple] = set()
+        seen: set[tuple[str, str, tuple[int, ...]]] = set()
         merged_refs: list[SourceRef] = []
         for ref in self.sources + other.sources:
             key = (ref.transcript_path, ref.transcript_hash, tuple(ref.turn_indices))
