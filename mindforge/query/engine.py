@@ -11,11 +11,43 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from datetime import datetime
 
 from mindforge.distillation.concept import Concept, ConceptStore
 from mindforge.embeddings.index import EmbeddingIndex
 from mindforge.graph.builder import KnowledgeGraph
 from mindforge.utils.text import extract_keywords
+
+
+def filter_concepts(
+    concepts: list[Concept],
+    tag: str | None = None,
+    min_confidence: float | None = None,
+    since: str | None = None,
+) -> list[Concept]:
+    """Filter concepts by tag, minimum confidence, and/or last-reinforced-since date."""
+    out = list(concepts)
+    if tag:
+        out = [c for c in out if tag in c.tags]
+    if min_confidence is not None:
+        out = [c for c in out if c.confidence >= min_confidence]
+    if since:
+        from datetime import timezone
+
+        cutoff = datetime.fromisoformat(since.replace("Z", "+00:00"))
+        if cutoff.tzinfo is None:
+            cutoff = cutoff.replace(tzinfo=timezone.utc)
+        kept: list[Concept] = []
+        for c in out:
+            if not c.last_reinforced_at:
+                continue
+            ts = datetime.fromisoformat(c.last_reinforced_at.replace("Z", "+00:00"))
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=timezone.utc)
+            if ts >= cutoff:
+                kept.append(c)
+        out = kept
+    return out
 
 
 @dataclass

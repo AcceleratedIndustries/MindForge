@@ -21,12 +21,52 @@ MindForge captures that knowledge and turns it into something you can **navigate
 
 ---
 
+## Install
+
+Pick the path that matches you:
+
+### Python users (recommended)
+
+```bash
+uv tool install mindforge-kb
+# or
+pipx install mindforge-kb
+```
+
+With optional embeddings for semantic search:
+
+```bash
+uv tool install 'mindforge-kb[embeddings]'
+```
+
+### Homebrew (macOS / Linux)
+
+```bash
+brew tap acceleratedindustries/mindforge
+brew install mindforge
+```
+
+### Single binary (no Python required)
+
+Download the latest binary for your platform from [GitHub Releases](https://github.com/AcceleratedIndustries/MindForge/releases):
+
+```bash
+curl -L https://github.com/AcceleratedIndustries/MindForge/releases/latest/download/mindforge-macos-arm64 -o mindforge
+chmod +x mindforge
+./mindforge --help
+```
+
+### From source
+
+```bash
+git clone https://github.com/AcceleratedIndustries/MindForge.git
+cd MindForge
+pip install -e ".[dev]"
+```
+
 ## Quick Start
 
 ```bash
-# Install
-pip install -e .
-
 # Run on your transcripts
 mindforge ingest --input path/to/transcripts --output output
 

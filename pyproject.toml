@@ -3,16 +3,48 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "mindforge"
-version = "0.1.0"
-description = "A semantic memory engine that transforms AI conversation transcripts into a structured, queryable knowledge base."
+name = "mindforge-kb"
+version = "0.2.0"
+description = "A local semantic memory engine that transforms AI conversation transcripts into a structured, queryable knowledge base."
+readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "BUSL-1.1" }
+authors = [
+    { name = "Accelerated Industries" },
+]
+keywords = [
+    "knowledge-base",
+    "semantic-memory",
+    "llm",
+    "mcp",
+    "knowledge-graph",
+    "rag",
+    "agents",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: Other/Proprietary License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
 
 dependencies = [
     "networkx>=3.4.2",
     "pyyaml>=6.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/AcceleratedIndustries/MindForge"
+Repository = "https://github.com/AcceleratedIndustries/MindForge"
+Issues = "https://github.com/AcceleratedIndustries/MindForge/issues"
+Documentation = "https://github.com/AcceleratedIndustries/MindForge/blob/main/README.md"
 
 [project.optional-dependencies]
 embeddings = [
@@ -27,7 +59,7 @@ eval = [
     "pyyaml>=6.0",
 ]
 all = [
-    "mindforge[embeddings,mcp,eval]",
+    "mindforge-kb[embeddings,mcp,eval]",
 ]
 dev = [
     "pytest>=8",
