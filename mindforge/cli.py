@@ -609,7 +609,7 @@ def cmd_show(args: argparse.Namespace) -> int:
 def cmd_open(args: argparse.Namespace) -> int:
     """Open a concept file or the graph JSON in $EDITOR."""
     import os
-    import subprocess
+    import subprocess  # nosec B404 — launching $EDITOR; shell=False is intentional
 
     editor = os.environ.get("EDITOR", "vi")
     config = MindForgeConfig(output_dir=args.output)
@@ -619,7 +619,8 @@ def cmd_open(args: argparse.Namespace) -> int:
         if not target.exists():
             print("No graph yet. Run 'mindforge ingest' first.", file=sys.stderr)
             return 1
-        return subprocess.call([editor, str(target)])
+        # $EDITOR is user-controlled on purpose; no shell involved.
+        return subprocess.call([editor, str(target)])  # nosec B603
 
     if not args.slug:
         print("Provide a slug or use --graph.", file=sys.stderr)
@@ -628,7 +629,8 @@ def cmd_open(args: argparse.Namespace) -> int:
     if not target.exists():
         print(f"Concept file not found: {target}", file=sys.stderr)
         return 1
-    return subprocess.call([editor, str(target)])
+    # $EDITOR is user-controlled on purpose; no shell involved.
+    return subprocess.call([editor, str(target)])  # nosec B603
 
 
 def cmd_mcp(args: argparse.Namespace) -> int:
