@@ -23,15 +23,16 @@ jobs:
           pip install build
           python -m build --sdist
       - name: Install as tool via uv
+        # `uv tool install` adds the `mindforge` shim under ~/.local/bin and
+        # puts it on PATH. We invoke that shim directly rather than via
+        # `uv tool run`, which would re-resolve the package name `mindforge`
+        # and pull a squatted, empty package from PyPI.
         run: uv tool install ./dist/*.tar.gz
       - name: Smoke — --help
-        # --from pins the source package: bare `uv tool run mindforge` resolves
-        # to a different (squatted) package on PyPI named `mindforge` and yields
-        # "Package `mindforge` does not provide any executables."
-        run: uv tool run --from mindforge-kb mindforge -- --help | head -5
+        run: mindforge --help | head -5
       - name: Smoke — ingest example corpus
         run: |
-          uv tool run --from mindforge-kb mindforge -- ingest --input examples/transcripts --output /tmp/mf-smoke
+          mindforge ingest --input examples/transcripts --output /tmp/mf-smoke
           test -s /tmp/mf-smoke/concepts.json
 
   pipx-install:
