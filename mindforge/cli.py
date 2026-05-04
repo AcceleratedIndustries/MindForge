@@ -14,6 +14,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from mindforge import __version__
 from mindforge.config import MindForgeConfig
 from mindforge.distillation.concept import Concept, ConceptStore
 from mindforge.pipeline import MindForgePipeline
@@ -304,7 +305,7 @@ def cmd_ingest(args: argparse.Namespace) -> int:
         llm_api_key=args.llm_api_key,
     )
 
-    print("MindForge v0.1.0")
+    print(f"MindForge v{__version__}")
     print(f"Input:  {config.transcripts_dir.resolve()}")
     print(f"Output: {config.output_dir.resolve()}")
     if config.use_llm:
