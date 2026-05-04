@@ -219,7 +219,7 @@ def extract_concepts_llm(
         prompt = EXTRACTION_USER_PROMPT.format(text=batch_text[:max_chars_per_call])
 
         logger.info("LLM extraction batch %d/%d (%d chunks)", i + 1, len(batches), len(batch))
-        response = client.generate(prompt, system=EXTRACTION_SYSTEM_PROMPT)
+        response = client.generate(prompt, system=EXTRACTION_SYSTEM_PROMPT, response_format="json")
         stats.llm_calls += 1
 
         if not response.success:
