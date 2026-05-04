@@ -182,8 +182,14 @@ class LLMClient:
 
     @staticmethod
     def _parse_ollama_response(body: dict) -> LLMResponse:
+        # Reasoning models (Qwen3, deepseek-r1, gpt-oss, ...) put their
+        # structured output in the ``thinking`` field with ``response``
+        # empty when ``format`` constrains generation. Prefer ``response``
+        # when present; otherwise fall back to ``thinking`` so the
+        # downstream JSON parser sees the model's actual output.
+        content = body.get("response", "") or body.get("thinking", "")
         return LLMResponse(
-            content=body.get("response", ""),
+            content=content,
             model=body.get("model", ""),
             prompt_tokens=body.get("prompt_eval_count", 0),
             completion_tokens=body.get("eval_count", 0),
