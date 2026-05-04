@@ -28,6 +28,12 @@ class LLMConfig:
     temperature: float = 0.1  # Low temp for deterministic extraction
     max_tokens: int = 4096
     timeout: int = 120  # seconds
+    # Ollama keep_alive: how long the model stays resident in VRAM between
+    # calls. The default 5m unloads mid-batch on slow / cold-start hardware,
+    # forcing 30-60s reloads per chunk and tripping `timeout`. The int -1
+    # pins the model for the lifetime of the Ollama server; a duration
+    # string like "30m" is also accepted. Ignored by OpenAI provider.
+    ollama_keep_alive: int | str = -1
 
     def __post_init__(self) -> None:
         if not self.base_url:
@@ -96,10 +102,11 @@ class LLMClient:
     def _generate_ollama(self, prompt: str, system: str) -> LLMResponse:
         """Generate via Ollama's /api/generate endpoint."""
         url = f"{self.config.base_url}/api/generate"
-        payload = {
+        payload: dict[str, object] = {
             "model": self.config.model,
             "prompt": prompt,
             "stream": False,
+            "keep_alive": self.config.ollama_keep_alive,
             "options": {
                 "temperature": self.config.temperature,
                 "num_predict": self.config.max_tokens,
