@@ -18,6 +18,7 @@ from mindforge import __version__
 from mindforge.config import MindForgeConfig
 from mindforge.distillation.concept import Concept, ConceptStore
 from mindforge.pipeline import MindForgePipeline
+from mindforge.query.engine import RetrievalWeights
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -137,6 +138,21 @@ def _build_parser() -> argparse.ArgumentParser:
         type=str,
         default=None,
         help="ISO timestamp — keep only concepts reinforced on/after this date",
+    )
+    query.add_argument(
+        "--mode",
+        choices=["hybrid", "keyword", "semantic"],
+        default="hybrid",
+        help="Retrieval mode (default: hybrid)",
+    )
+    query.add_argument(
+        "--weights",
+        type=str,
+        default=None,
+        metavar="K,S,G",
+        help=(
+            "Override default weights as comma-separated keyword,semantic,graph (e.g. 0.4,0.4,0.2)"
+        ),
     )
 
     # --- list ---
@@ -329,6 +345,26 @@ def cmd_ingest(args: argparse.Namespace) -> int:
     return 0
 
 
+def _parse_weights(raw: str | None) -> RetrievalWeights | None:
+    """Parse a ``--weights K,S,G`` CLI string into a RetrievalWeights instance.
+
+    Returns None if ``raw`` is falsy. Calls ``sys.exit`` with a clear message
+    when the input is not three comma-separated floats.
+    """
+    if not raw:
+        return None
+    parts = raw.split(",")
+    if len(parts) != 3:
+        raise SystemExit("--weights must be three comma-separated floats: keyword,semantic,graph")
+    try:
+        floats = [float(x) for x in parts]
+    except ValueError as exc:
+        raise SystemExit(
+            "--weights must be three comma-separated floats: keyword,semantic,graph"
+        ) from exc
+    return RetrievalWeights(keyword=floats[0], semantic=floats[1], graph=floats[2])
+
+
 def cmd_query(args: argparse.Namespace) -> int:
     """Query the knowledge base, optionally filtered by tag/confidence/date."""
     from mindforge.query.engine import filter_concepts
@@ -344,7 +380,11 @@ def cmd_query(args: argparse.Namespace) -> int:
         print("No knowledge base found. Run 'mindforge ingest' first.", file=sys.stderr)
         return 1
 
-    results = pipeline.query_engine.search(args.question, top_k=args.top_k)
+    weights = _parse_weights(getattr(args, "weights", None))
+    mode = getattr(args, "mode", "hybrid")
+    results = pipeline.query_engine.search(
+        args.question, top_k=args.top_k, mode=mode, weights=weights
+    )
 
     # Apply filters post-search so semantic scoring isn't distorted.
     if args.tag or args.min_confidence is not None or args.since:
