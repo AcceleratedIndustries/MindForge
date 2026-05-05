@@ -13,9 +13,7 @@ def test_embed_calls_v1_embeddings_endpoint():
         api_key="test-key",
     )
     fake_response = MagicMock()
-    fake_response.read.return_value = json.dumps(
-        {"data": [{"embedding": [0.1, 0.2]}]}
-    ).encode()
+    fake_response.read.return_value = json.dumps({"data": [{"embedding": [0.1, 0.2]}]}).encode()
     fake_response.__enter__ = lambda s: s
     fake_response.__exit__ = lambda *a: None
     with patch("urllib.request.urlopen", return_value=fake_response) as urlopen:

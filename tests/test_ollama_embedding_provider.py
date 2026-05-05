@@ -22,9 +22,7 @@ def test_embed_single_text_calls_correct_endpoint():
 
 
 def test_embed_batch_returns_list_of_vectors():
-    provider = OllamaEmbeddingProvider(
-        base_url="http://localhost:11434", model="nomic-embed-text"
-    )
+    provider = OllamaEmbeddingProvider(base_url="http://localhost:11434", model="nomic-embed-text")
     with patch.object(provider, "embed", side_effect=lambda t: [float(len(t))]):
         vecs = provider.embed_batch(["a", "bb", "ccc"])
     assert vecs == [[1.0], [2.0], [3.0]]

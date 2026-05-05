@@ -239,7 +239,10 @@ class MindForgePipeline:
         print("[6/6] Building embeddings index...")
         embeddings_built = False
         if self.config.use_embeddings:
-            self.embedding_index = EmbeddingIndex(self.config.embedding_model)
+            self.embedding_index = EmbeddingIndex(
+                self.config.embedding_model,
+                embedder=self.config.embedding_provider,
+            )
             if self.embedding_index.available:
                 self.embedding_index.build(self.store.all())
                 self.embedding_index.save(self.config.embeddings_dir)
@@ -341,7 +344,10 @@ class MindForgePipeline:
 
         index = None
         if self.config.use_embeddings:
-            index = EmbeddingIndex.load(self.config.embeddings_dir)
+            index = EmbeddingIndex.load(
+                self.config.embeddings_dir,
+                embedder=self.config.embedding_provider,
+            )
             if index.available:
                 self.embedding_index = index
 
