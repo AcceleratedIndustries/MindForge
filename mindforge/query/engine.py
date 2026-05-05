@@ -1,22 +1,29 @@
-"""Query engine: provides a simple interface for searching the knowledge base.
+"""Query engine: hybrid retrieval orchestrator.
 
-Supports two search modes:
-1. Keyword search (always available) - TF-IDF-like matching
-2. Semantic search (when embeddings are available) - vector similarity
+Combines three signals:
 
-Results are combined and ranked.
+1. Keyword (BM25-lite via :class:`KeywordScorer`) — always available.
+2. Semantic (vector similarity via :class:`EmbeddingIndex`) — optional.
+3. Graph walk (reinforcement from neighbors via :class:`GraphWalker`).
+
+Results are ranked by a weighted blend; weights are tunable per call via
+:class:`RetrievalWeights`. The legacy single-mode behaviors are reachable
+via ``mode="keyword"`` or ``mode="semantic"``.
 """
 
 from __future__ import annotations
 
-import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from mindforge.distillation.concept import Concept, ConceptStore
-from mindforge.embeddings.index import EmbeddingIndex
 from mindforge.graph.builder import KnowledgeGraph
-from mindforge.utils.text import extract_keywords
+from mindforge.query.graph_walker import GraphWalker
+from mindforge.query.keyword_scorer import KeywordScorer
+
+if TYPE_CHECKING:
+    from mindforge.embeddings.index import EmbeddingIndex
 
 
 def filter_concepts(
@@ -51,17 +58,62 @@ def filter_concepts(
 
 
 @dataclass
+class RetrievalWeights:
+    """Weighting for the three retrieval signals.
+
+    Defaults assume embeddings are available. If they aren't, callers should
+    use :meth:`no_embeddings` or let :meth:`QueryEngine.search` substitute it
+    automatically when ``mode="hybrid"``.
+    """
+
+    keyword: float = 0.4
+    semantic: float = 0.4
+    graph: float = 0.2
+
+    @classmethod
+    def no_embeddings(cls) -> RetrievalWeights:
+        return cls(keyword=0.6, semantic=0.0, graph=0.4)
+
+    @classmethod
+    def keyword_only(cls) -> RetrievalWeights:
+        return cls(keyword=1.0, semantic=0.0, graph=0.0)
+
+    @classmethod
+    def semantic_only(cls) -> RetrievalWeights:
+        return cls(keyword=0.0, semantic=1.0, graph=0.0)
+
+
+@dataclass
 class QueryResult:
-    """A single result from a knowledge base query."""
+    """A single result from a knowledge base query.
+
+    ``score`` and ``neighbors`` are preserved for backward compatibility with
+    the existing MCP server payload shape.
+    """
 
     concept: Concept
-    score: float
-    match_type: str  # "keyword", "semantic", "combined"
-    neighbors: list[str]  # related concept slugs
+    score_total: float
+    score_breakdown: dict[str, float]
+    matched_via: list[str]
+    neighbors: list[str] = field(default_factory=list)
+
+    @property
+    def score(self) -> float:
+        return self.score_total
+
+    @property
+    def match_type(self) -> str:
+        if not self.matched_via:
+            return "none"
+        if len(self.matched_via) == 1:
+            return self.matched_via[0]
+        return "combined"
 
 
 class QueryEngine:
     """Search interface for the MindForge knowledge base."""
+
+    SEED_POOL_SIZE = 10
 
     def __init__(
         self,
@@ -72,98 +124,103 @@ class QueryEngine:
         self._store = store
         self._graph = graph
         self._index = embedding_index
+        self._keyword_scorer = KeywordScorer(store.all())
+        self._graph_walker = GraphWalker(graph) if graph is not None else None
 
-    def search(self, query: str, top_k: int = 5) -> list[QueryResult]:
-        """Search the knowledge base with a natural language query.
+    def search(
+        self,
+        query: str,
+        top_k: int = 5,
+        mode: str = "hybrid",
+        weights: RetrievalWeights | None = None,
+    ) -> list[QueryResult]:
+        """Search the knowledge base with a natural language query."""
+        if weights is None:
+            weights = self._default_weights(mode)
 
-        Combines keyword and semantic search when available.
-        """
-        scores: dict[str, tuple[float, str]] = {}  # slug -> (score, match_type)
+        kw_scores = self._keyword_scorer.score(query) if weights.keyword > 0 else {}
 
-        # Keyword search (always available)
-        kw_results = self._keyword_search(query, top_k=top_k * 2)
-        for slug, score in kw_results:
-            scores[slug] = (score, "keyword")
+        sem_scores: dict[str, float] = {}
+        if weights.semantic > 0 and self._index is not None and self._index.available:
+            sem_scores = self._semantic_scores(query)
 
-        # Semantic search (when available)
-        if self._index and self._index.available:
-            sem_results = self._index.query(query, top_k=top_k * 2)
-            for slug, score in sem_results:
-                if slug in scores:
-                    # Combine scores
-                    old_score = scores[slug][0]
-                    scores[slug] = (old_score * 0.4 + score * 0.6, "combined")
-                else:
-                    scores[slug] = (score, "semantic")
+        seed_pool = self._build_seed_pool(kw_scores, sem_scores)
+        graph_scores: dict[str, float] = {}
+        if weights.graph > 0 and self._graph_walker is not None:
+            graph_scores = self._graph_walker.walk(seed_pool)
 
-        # Sort by score and build results
-        ranked = sorted(scores.items(), key=lambda x: x[1][0], reverse=True)
+        all_slugs = set(kw_scores) | set(sem_scores) | set(graph_scores)
         results: list[QueryResult] = []
-
-        for slug, (score, match_type) in ranked[:top_k]:
+        for slug in all_slugs:
+            k = kw_scores.get(slug, 0.0)
+            s = sem_scores.get(slug, 0.0)
+            g = graph_scores.get(slug, 0.0)
+            kw_part = weights.keyword * k
+            sem_part = weights.semantic * s
+            graph_part = weights.graph * g
+            total = kw_part + sem_part + graph_part
+            if total <= 0.0:
+                continue
+            matched_via = [
+                label for label, raw in (("keyword", k), ("semantic", s), ("graph", g)) if raw > 0.0
+            ]
             concept = self._store.get(slug)
             if concept is None:
                 continue
-
-            neighbors = []
-            if self._graph:
-                neighbors = self._graph.neighbors(slug)
-
+            neighbors = self._graph.neighbors(slug) if self._graph is not None else []
             results.append(
                 QueryResult(
                     concept=concept,
-                    score=score,
-                    match_type=match_type,
+                    score_total=total,
+                    score_breakdown={
+                        "keyword": kw_part,
+                        "semantic": sem_part,
+                        "graph": graph_part,
+                    },
+                    matched_via=matched_via,
                     neighbors=neighbors,
                 )
             )
+        results.sort(key=lambda r: r.score_total, reverse=True)
+        return results[:top_k]
 
-        return results
+    def _default_weights(self, mode: str) -> RetrievalWeights:
+        if mode == "hybrid":
+            if self._index is not None and self._index.available:
+                return RetrievalWeights()
+            return RetrievalWeights.no_embeddings()
+        if mode == "keyword":
+            return RetrievalWeights.keyword_only()
+        if mode == "semantic":
+            return RetrievalWeights.semantic_only()
+        raise ValueError(f"Unknown mode: {mode}")
 
-    def _keyword_search(
+    def _build_seed_pool(
         self,
-        query: str,
-        top_k: int = 10,
-    ) -> list[tuple[str, float]]:
-        """Search concepts by keyword matching."""
-        query_terms = set(re.findall(r"\w+", query.lower()))
-        query_keywords = set(extract_keywords(query, top_n=10))
-        all_query_terms = query_terms | query_keywords
+        kw_scores: dict[str, float],
+        sem_scores: dict[str, float],
+    ) -> dict[str, float]:
+        top_kw = sorted(kw_scores.items(), key=lambda x: x[1], reverse=True)[: self.SEED_POOL_SIZE]
+        top_sem = sorted(sem_scores.items(), key=lambda x: x[1], reverse=True)[
+            : self.SEED_POOL_SIZE
+        ]
+        seed_pool: dict[str, float] = {}
+        for slug, s in top_kw + top_sem:
+            if s <= 0.0:
+                continue
+            seed_pool[slug] = max(seed_pool.get(slug, 0.0), s)
+        return seed_pool
 
-        if not all_query_terms:
-            return []
-
-        scored: list[tuple[str, float]] = []
-
-        for concept in self._store.all():
-            score = 0.0
-
-            # Name match (highest weight)
-            name_lower = concept.name.lower()
-            name_words = set(re.findall(r"\w+", name_lower))
-            name_overlap = len(all_query_terms & name_words)
-            if name_overlap:
-                score += name_overlap * 0.4
-
-            # Exact name substring match
-            if query.lower() in name_lower or name_lower in query.lower():
-                score += 0.5
-
-            # Tag match
-            tag_set = set(t.lower() for t in concept.tags)
-            tag_overlap = len(all_query_terms & tag_set)
-            score += tag_overlap * 0.2
-
-            # Definition keyword match
-            def_words = set(re.findall(r"\w+", concept.definition.lower()))
-            def_overlap = len(all_query_terms & def_words)
-            score += def_overlap * 0.05
-
-            if score > 0:
-                scored.append((concept.slug, min(score, 1.0)))
-
-        scored.sort(key=lambda x: x[1], reverse=True)
-        return scored[:top_k]
+    def _semantic_scores(self, query: str) -> dict[str, float]:
+        if self._index is None:
+            return {}
+        raw = self._index.query(query, top_k=self.SEED_POOL_SIZE * 5)
+        if not raw:
+            return {}
+        max_score = max((score for _, score in raw), default=0.0)
+        if max_score <= 0.0:
+            return {slug: 0.0 for slug, _ in raw}
+        return {slug: score / max_score for slug, score in raw}
 
     def format_results(self, results: list[QueryResult]) -> str:
         """Format query results as human-readable text."""
@@ -174,7 +231,9 @@ class QueryEngine:
         for i, result in enumerate(results, 1):
             c = result.concept
             lines.append(f"{'─' * 60}")
-            lines.append(f"  [{i}] {c.name}  (score: {result.score:.2f}, {result.match_type})")
+            lines.append(
+                f"  [{i}] {c.name}  (score: {result.score_total:.2f}, {result.match_type})"
+            )
             lines.append(f"      {c.definition[:150]}...")
             if result.neighbors:
                 neighbor_names = []
