@@ -92,14 +92,21 @@ class LLMClient:
         except (urllib.error.URLError, OSError, TimeoutError):
             return False
 
-    def generate(self, prompt: str, system: str = "") -> LLMResponse:
-        """Send a prompt to the LLM and return the response."""
-        if self.config.provider == "ollama":
-            return self._generate_ollama(prompt, system)
-        else:
-            return self._generate_openai(prompt, system)
+    def generate(self, prompt: str, system: str = "", response_format: str = "") -> LLMResponse:
+        """Send a prompt to the LLM and return the response.
 
-    def _generate_ollama(self, prompt: str, system: str) -> LLMResponse:
+        ``response_format`` is an optional format hint; when set to ``"json"``
+        the provider is asked to constrain output to valid JSON via
+        grammar-constrained decoding (Ollama ``format``, OpenAI
+        ``response_format``). This is roughly 2x faster on Ollama for JSON
+        outputs and eliminates parse failures from prose-wrapping.
+        """
+        if self.config.provider == "ollama":
+            return self._generate_ollama(prompt, system, response_format)
+        else:
+            return self._generate_openai(prompt, system, response_format)
+
+    def _generate_ollama(self, prompt: str, system: str, response_format: str) -> LLMResponse:
         """Generate via Ollama's /api/generate endpoint."""
         url = f"{self.config.base_url}/api/generate"
         payload: dict[str, object] = {
@@ -114,10 +121,12 @@ class LLMClient:
         }
         if system:
             payload["system"] = system
+        if response_format:
+            payload["format"] = response_format
 
         return self._post_json(url, payload, self._parse_ollama_response)
 
-    def _generate_openai(self, prompt: str, system: str) -> LLMResponse:
+    def _generate_openai(self, prompt: str, system: str, response_format: str) -> LLMResponse:
         """Generate via OpenAI-compatible /v1/chat/completions endpoint."""
         url = f"{self.config.base_url}/v1/chat/completions"
         messages = []
@@ -125,12 +134,14 @@ class LLMClient:
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
 
-        payload = {
+        payload: dict[str, object] = {
             "model": self.config.model,
             "messages": messages,
             "temperature": self.config.temperature,
             "max_tokens": self.config.max_tokens,
         }
+        if response_format == "json":
+            payload["response_format"] = {"type": "json_object"}
 
         return self._post_json(url, payload, self._parse_openai_response)
 
@@ -171,8 +182,14 @@ class LLMClient:
 
     @staticmethod
     def _parse_ollama_response(body: dict) -> LLMResponse:
+        # Reasoning models (Qwen3, deepseek-r1, gpt-oss, ...) put their
+        # structured output in the ``thinking`` field with ``response``
+        # empty when ``format`` constrains generation. Prefer ``response``
+        # when present; otherwise fall back to ``thinking`` so the
+        # downstream JSON parser sees the model's actual output.
+        content = body.get("response", "") or body.get("thinking", "")
         return LLMResponse(
-            content=body.get("response", ""),
+            content=content,
             model=body.get("model", ""),
             prompt_tokens=body.get("prompt_eval_count", 0),
             completion_tokens=body.get("eval_count", 0),
