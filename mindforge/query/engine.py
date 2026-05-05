@@ -134,7 +134,13 @@ class QueryEngine:
         mode: str = "hybrid",
         weights: RetrievalWeights | None = None,
     ) -> list[QueryResult]:
-        """Search the knowledge base with a natural language query."""
+        """Search the knowledge base with a natural language query.
+
+        ``mode`` is validated even when ``weights`` is supplied so a typo in
+        ``mode`` cannot pass silently.
+        """
+        if mode not in ("hybrid", "keyword", "semantic"):
+            raise ValueError(f"Unknown mode: {mode!r}")
         if weights is None:
             weights = self._default_weights(mode)
 

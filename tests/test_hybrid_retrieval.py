@@ -76,16 +76,25 @@ def test_hybrid_includes_score_breakdown(
     assert "semantic" in results[0].score_breakdown
 
 
-def test_graph_walk_lifts_neighbor_above_keyword_only(
+def test_graph_walk_surfaces_neighbor_with_no_keyword_match(
     kb: tuple[ConceptStore, KnowledgeGraph],
 ) -> None:
-    """A concept connected to a strong keyword hit should outrank an unrelated weak match."""
+    """A neighbor of a strong keyword hit should appear in results even if the
+    neighbor itself has no keyword overlap with the query."""
     store, graph = kb
     engine = QueryEngine(store, graph)
-    results = engine.search("retrieval-augmented generation", top_k=3)
+    results = engine.search("retrieval-augmented generation", top_k=5)
     slugs = [r.concept.slug for r in results]
-    if "vector-embedding" in slugs and "kubernetes" in slugs:
-        assert slugs.index("vector-embedding") < slugs.index("kubernetes")
+    assert "vector-embedding" in slugs, (
+        "Vector Embedding has no keyword overlap with the query but is connected "
+        "to Retrieval-Augmented Generation via a 'uses' edge; graph reinforcement "
+        "should surface it."
+    )
+    rag_idx = slugs.index("retrieval-augmented-generation")
+    vec_idx = slugs.index("vector-embedding")
+    assert rag_idx < vec_idx, (
+        "The direct keyword hit should still rank above the graph-reinforced neighbor."
+    )
 
 
 def test_keyword_only_mode_skips_graph_walk(
