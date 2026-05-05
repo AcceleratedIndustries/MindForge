@@ -30,7 +30,6 @@ def _concept_text(concept: Concept) -> str:
 
 @dataclass
 class _DocStats:
-    tokens: list[str]
     counts: Counter[str]
     length: int
 
@@ -43,9 +42,7 @@ class KeywordScorer:
         df: Counter[str] = Counter()
         for c in concepts:
             tokens = _tokenize(_concept_text(c))
-            self._docs[c.slug] = _DocStats(
-                tokens=tokens, counts=Counter(tokens), length=len(tokens)
-            )
+            self._docs[c.slug] = _DocStats(counts=Counter(tokens), length=len(tokens))
             for term in set(tokens):
                 df[term] += 1
         n = max(1, len(concepts))
