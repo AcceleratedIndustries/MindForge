@@ -131,6 +131,28 @@ class KnowledgeGraph:
                 connected.add(edge["source"])
         return list(connected)
 
+    def neighbors_with_confidence(self, slug: str) -> list[tuple[str, float]]:
+        """Return [(neighbor_slug, edge_confidence)] for outgoing edges from slug."""
+        if self._graph is not None:
+            if slug not in self._graph:
+                return []
+            out: list[tuple[str, float]] = []
+            for neighbor in self._graph.successors(slug):
+                edge = self._graph[slug][neighbor]
+                out.append((neighbor, float(edge.get("confidence", 1.0))))
+            return out
+        out_fb: list[tuple[str, float]] = []
+        for edge in self._edges:
+            if edge["source"] == slug:
+                out_fb.append((edge["target"], float(edge.get("confidence", 1.0))))
+        return out_fb
+
+    def nodes(self) -> list[str]:
+        """Return all node slugs."""
+        if self._graph is not None:
+            return list(self._graph.nodes())
+        return list(self._nodes.keys())
+
     def central_concepts(self, top_n: int = 10) -> list[tuple[str, float]]:
         """Return the most central concepts by degree centrality."""
         if self._graph is not None and len(self._graph) > 0:
