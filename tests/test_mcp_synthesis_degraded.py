@@ -69,3 +69,19 @@ def test_synthesis_unavailable_response_shape() -> None:
     assert payload["error"] == "synthesis_backend_unavailable"
     assert "http://localhost:11434" in payload["message"]
     assert "get_concept" in payload["message"]
+
+
+def test_get_llm_client_caches_in_runtime(monkeypatch) -> None:
+    """The cached client is returned on subsequent calls without rebuilding."""
+    cfg = ConfigFile(llm=LLMConfigSection(base_url="http://localhost:11434"))
+
+    class _Stub:
+        def __init__(self, _cfg) -> None:
+            self.config = _cfg
+
+    monkeypatch.setattr(mcp_server, "LLMClient", _Stub)
+    monkeypatch.setattr(mcp_server, "_check_llm_health", lambda _cfg: False)
+    mcp_server.configure_runtime(cfg)
+    first = mcp_server._runtime["llm_client"]
+    second = mcp_server._get_llm_client()
+    assert first is second
