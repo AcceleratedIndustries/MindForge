@@ -16,22 +16,23 @@ from typing import Any
 
 from mindforge import __version__
 from mindforge.config import MindForgeConfig
+from mindforge.config_file import ConfigFile, load_config, merge_with_overrides
 from mindforge.distillation.concept import Concept, ConceptStore
 from mindforge.embeddings.index import Embedder
 from mindforge.pipeline import MindForgePipeline
 from mindforge.query.engine import RetrievalWeights
 
 
-def _build_embedder(args: argparse.Namespace) -> Embedder | None:
-    """Construct an embedding provider from CLI args. None means use the default
-    sentence-transformers path inside EmbeddingIndex."""
-    provider = getattr(args, "embedding_provider", "sentence-transformers")
+def _build_embedder(file_cfg: ConfigFile) -> Embedder | None:
+    """Construct an embedding provider from the merged config. None means use
+    the default sentence-transformers path inside EmbeddingIndex."""
+    provider = file_cfg.embeddings.provider
     if provider == "ollama":
         from mindforge.embeddings.ollama_provider import OllamaEmbeddingProvider
 
         return OllamaEmbeddingProvider(
-            base_url=args.embedding_base_url or "http://localhost:11434",
-            model=args.embedding_model or "nomic-embed-text",
+            base_url=file_cfg.embeddings.base_url or "http://localhost:11434",
+            model=file_cfg.embeddings.model or "nomic-embed-text",
         )
     if provider == "openai-compat":
         from mindforge.embeddings.openai_compat_provider import (
@@ -39,11 +40,28 @@ def _build_embedder(args: argparse.Namespace) -> Embedder | None:
         )
 
         return OpenAICompatibleEmbeddingProvider(
-            base_url=args.embedding_base_url or "http://localhost:8080/v1",
-            model=args.embedding_model or "text-embedding-3-small",
-            api_key=args.embedding_api_key,
+            base_url=file_cfg.embeddings.base_url or "http://localhost:8080/v1",
+            model=file_cfg.embeddings.model or "text-embedding-3-small",
+            api_key=file_cfg.embeddings.api_key,
         )
     return None
+
+
+def _load_merged_config(args: argparse.Namespace) -> ConfigFile:
+    """Load the YAML config file and apply CLI overrides. None/empty CLI flags
+    are skipped so the file (or dataclass defaults) survive."""
+    file_cfg = load_config()
+    return merge_with_overrides(
+        file_cfg,
+        llm_provider=getattr(args, "llm_provider", None),
+        llm_base_url=getattr(args, "llm_base_url", None),
+        llm_model=getattr(args, "llm_model", None),
+        llm_api_key=getattr(args, "llm_api_key", None),
+        embeddings_provider=getattr(args, "embedding_provider", None),
+        embeddings_base_url=getattr(args, "embedding_base_url", None),
+        embeddings_model=getattr(args, "embedding_model", None),
+        embeddings_api_key=getattr(args, "embedding_api_key", None),
+    )
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -99,23 +117,23 @@ def _build_parser() -> argparse.ArgumentParser:
     llm_group.add_argument(
         "--llm-provider",
         choices=["ollama", "openai"],
-        default="ollama",
-        help="LLM provider (default: ollama)",
+        default=None,
+        help="LLM provider (overrides config; default: from config or ollama)",
     )
     llm_group.add_argument(
         "--llm-model",
-        default="llama3.2",
-        help="LLM model name (default: llama3.2)",
+        default=None,
+        help="LLM model name (overrides config; default: from config or qwen3:30b-a3b)",
     )
     llm_group.add_argument(
         "--llm-base-url",
         default="",
-        help="LLM API base URL (default: auto-detect from provider)",
+        help="LLM API base URL (overrides config; default: auto-detect from provider)",
     )
     llm_group.add_argument(
         "--llm-api-key",
         default="",
-        help="API key for OpenAI-compatible providers",
+        help="API key for OpenAI-compatible providers (overrides config)",
     )
 
     # Embedding provider options
@@ -123,8 +141,8 @@ def _build_parser() -> argparse.ArgumentParser:
     emb_group.add_argument(
         "--embedding-provider",
         choices=["sentence-transformers", "ollama", "openai-compat"],
-        default="sentence-transformers",
-        help="Embedding provider (default: sentence-transformers)",
+        default=None,
+        help="Embedding provider (overrides config; default: from config or sentence-transformers)",
     )
     emb_group.add_argument(
         "--embedding-base-url",
@@ -207,8 +225,8 @@ def _build_parser() -> argparse.ArgumentParser:
     qemb_group.add_argument(
         "--embedding-provider",
         choices=["sentence-transformers", "ollama", "openai-compat"],
-        default="sentence-transformers",
-        help="Embedding provider (default: sentence-transformers)",
+        default=None,
+        help="Embedding provider (overrides config; default: from config or sentence-transformers)",
     )
     qemb_group.add_argument(
         "--embedding-base-url",
@@ -395,22 +413,40 @@ def _build_parser() -> argparse.ArgumentParser:
         default=Path("output"),
     )
 
+    # --- config ---
+    config_p = subparsers.add_parser(
+        "config",
+        help="Show or initialize the MindForge config file",
+    )
+    config_sub = config_p.add_subparsers(dest="config_command")
+    config_sub.add_parser("show", help="Print the merged effective config")
+    config_init = config_sub.add_parser(
+        "init",
+        help="Write a commented config template to ~/.config/mindforge/config.yaml",
+    )
+    config_init.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite existing config file",
+    )
+
     return parser
 
 
 def cmd_ingest(args: argparse.Namespace) -> int:
     """Run the ingestion pipeline."""
+    file_cfg = _load_merged_config(args)
     config = MindForgeConfig(
         transcripts_dir=args.input,
         output_dir=args.output,
         use_embeddings=args.embeddings,
         similarity_threshold=args.similarity_threshold,
         use_llm=args.llm,
-        llm_provider=args.llm_provider,
-        llm_model=args.llm_model,
-        llm_base_url=args.llm_base_url,
-        llm_api_key=args.llm_api_key,
-        embedding_provider=_build_embedder(args) if args.embeddings else None,
+        llm_provider=file_cfg.llm.provider,
+        llm_model=file_cfg.llm.model,
+        llm_base_url=file_cfg.llm.base_url,
+        llm_api_key=file_cfg.llm.api_key,
+        embedding_provider=_build_embedder(file_cfg) if args.embeddings else None,
     )
 
     print(f"MindForge v{__version__}")
@@ -461,10 +497,11 @@ def cmd_query(args: argparse.Namespace) -> int:
     """Query the knowledge base, optionally filtered by tag/confidence/date."""
     from mindforge.query.engine import filter_concepts
 
+    file_cfg = _load_merged_config(args)
     config = MindForgeConfig(
         output_dir=args.output,
         use_embeddings=args.embeddings,
-        embedding_provider=_build_embedder(args) if args.embeddings else None,
+        embedding_provider=_build_embedder(file_cfg) if args.embeddings else None,
     )
 
     pipeline = MindForgePipeline(config)
@@ -474,6 +511,13 @@ def cmd_query(args: argparse.Namespace) -> int:
         return 1
 
     weights = _parse_weights(getattr(args, "weights", None))
+    if weights is None:
+        fw = file_cfg.retrieval.weights
+        weights = RetrievalWeights(
+            keyword=fw.get("keyword", 0.4),
+            semantic=fw.get("semantic", 0.4),
+            graph=fw.get("graph", 0.2),
+        )
     mode = getattr(args, "mode", "hybrid")
     results = pipeline.query_engine.search(
         args.question, top_k=args.top_k, mode=mode, weights=weights
@@ -799,6 +843,70 @@ def cmd_mcp(args: argparse.Namespace) -> int:
     return 0
 
 
+_CONFIG_TEMPLATE = """# MindForge config
+# See docs/superpowers/specs/2026-05-05-phase3-v0.3.0-design.md for the spec.
+
+llm:
+  provider: ollama          # ollama | openai
+  base_url: http://localhost:11434
+  model: qwen3:30b-a3b
+  keep_alive: -1
+  timeout: 120
+  api_key: ""
+  # Optional: route summarize_query to a bigger model. Useful for metered APIs.
+  # summarize_model: nemotron-3-super:latest
+
+embeddings:
+  provider: sentence-transformers   # sentence-transformers | ollama | openai-compat
+  base_url: ""
+  model: ""
+  api_key: ""
+
+retrieval:
+  weights:
+    keyword: 0.4
+    semantic: 0.4
+    graph: 0.2
+  seed_pool_size: 10
+  walk_depth: 2
+"""
+
+
+def cmd_config(args: argparse.Namespace) -> int:
+    import yaml
+
+    from mindforge.config_file import default_config_path, load_config
+
+    if args.config_command == "show":
+        p = default_config_path()
+        cfg = load_config(p)
+        source = str(p) if p.exists() else "(defaults — no config file found)"
+        print(f"# Loaded from: {source}\n")
+        out = {
+            "llm": cfg.llm.__dict__,
+            "embeddings": cfg.embeddings.__dict__,
+            "retrieval": cfg.retrieval.__dict__,
+        }
+        print(yaml.safe_dump(out, sort_keys=False), end="")
+        return 0
+
+    if args.config_command == "init":
+        p = default_config_path()
+        if p.exists() and not args.force:
+            print(
+                f"Config file already exists at {p}. Use --force to overwrite.",
+                file=sys.stderr,
+            )
+            return 1
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(_CONFIG_TEMPLATE)
+        print(f"Wrote template config to {p}")
+        return 0
+
+    print("Run 'mindforge config show' or 'mindforge config init'.", file=sys.stderr)
+    return 1
+
+
 def main() -> int:
     parser = _build_parser()
     args = parser.parse_args()
@@ -818,6 +926,7 @@ def main() -> int:
         "diff": cmd_diff,
         "list": cmd_list,
         "open": cmd_open,
+        "config": cmd_config,
     }
 
     handler = commands.get(args.command)
