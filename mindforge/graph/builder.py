@@ -131,6 +131,32 @@ class KnowledgeGraph:
                 connected.add(edge["source"])
         return list(connected)
 
+    def shortest_paths(
+        self,
+        source: str,
+        target: str,
+        max_length: int = 4,
+        max_paths: int = 3,
+    ) -> list[list[str]]:
+        """Return up to ``max_paths`` shortest paths between ``source`` and
+        ``target``, each containing at most ``max_length`` edges. Treats the
+        graph as undirected so semantically-related concepts are reachable
+        regardless of edge direction.
+        """
+        if self._graph is None or source not in self._graph or target not in self._graph:
+            return []
+        paths: list[list[str]] = []
+        try:
+            for p in nx.all_shortest_paths(self._graph.to_undirected(), source, target):
+                if len(p) - 1 > max_length:
+                    continue
+                paths.append(list(p))
+                if len(paths) >= max_paths:
+                    break
+        except nx.NetworkXNoPath:
+            return []
+        return paths
+
     def neighbors_with_confidence(self, slug: str) -> list[tuple[str, float]]:
         """Return [(neighbor_slug, edge_confidence)] for outgoing edges from slug."""
         if self._graph is not None:
