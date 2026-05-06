@@ -323,9 +323,29 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     ev.add_argument(
         "--mode",
-        choices=["heuristic", "llm"],
+        choices=["heuristic", "llm", "tune-retrieval"],
         default="heuristic",
-        help="Extraction mode (default: heuristic)",
+        help="Extraction mode, or tune-retrieval to sweep hybrid weights",
+    )
+    ev.add_argument(
+        "--output",
+        "-o",
+        type=Path,
+        default=Path("output"),
+        help="(tune-retrieval only) pre-ingested KB to sweep weights against",
+    )
+    ev.add_argument(
+        "--top-k",
+        "-k",
+        type=int,
+        default=5,
+        help="(tune-retrieval only) top-k for recall@k metric (default: 5)",
+    )
+    ev.add_argument(
+        "--step",
+        type=float,
+        default=0.1,
+        help="(tune-retrieval only) weight grid step size (default: 0.1)",
     )
 
     # --- show ---
@@ -635,9 +655,30 @@ def cmd_review(args: argparse.Namespace) -> int:
 
 def cmd_eval(args: argparse.Namespace) -> int:
     """Run the evaluation harness and write a JSON report."""
+    import json
     from datetime import datetime, timezone
 
-    from mindforge.eval.runner import render_markdown, run_eval
+    from mindforge.eval.runner import (
+        render_markdown,
+        render_tune_markdown,
+        run_eval,
+        run_tune_retrieval,
+    )
+
+    args.reports.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+
+    if args.mode == "tune-retrieval":
+        if not args.output.is_dir():
+            print(f"Output directory not found: {args.output}", file=sys.stderr)
+            return 1
+        report = run_tune_retrieval(args.output, k=args.top_k, step=args.step)
+        print(render_tune_markdown(report))
+        (args.reports / f"{stamp}-tune.json").write_text(
+            json.dumps(report, indent=2),
+            encoding="utf-8",
+        )
+        return 0
 
     if not args.fixtures.is_dir():
         print(f"Fixtures directory not found: {args.fixtures}", file=sys.stderr)
@@ -645,10 +686,6 @@ def cmd_eval(args: argparse.Namespace) -> int:
 
     report = run_eval(args.fixtures, mode=args.mode)
     print(render_markdown(report))
-
-    args.reports.mkdir(parents=True, exist_ok=True)
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    import json
 
     (args.reports / f"{stamp}.json").write_text(
         json.dumps(report, indent=2),
