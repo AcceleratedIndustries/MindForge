@@ -57,6 +57,8 @@ def _load_merged_config(args: argparse.Namespace) -> ConfigFile:
         llm_base_url=getattr(args, "llm_base_url", None),
         llm_model=getattr(args, "llm_model", None),
         llm_api_key=getattr(args, "llm_api_key", None),
+        llm_summarize_model=getattr(args, "llm_summarize_model", None),
+        llm_timeout=getattr(args, "llm_timeout", None),
         embeddings_provider=getattr(args, "embedding_provider", None),
         embeddings_base_url=getattr(args, "embedding_base_url", None),
         embeddings_model=getattr(args, "embedding_model", None),
@@ -307,6 +309,31 @@ def _build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=Path("output"),
         help="Output directory containing the knowledge base (default: output)",
+    )
+    mcp_llm = mcp.add_argument_group("LLM (synthesis tools)")
+    mcp_llm.add_argument(
+        "--llm-provider",
+        choices=["ollama", "openai"],
+        default=None,
+        help="LLM provider (overrides config)",
+    )
+    mcp_llm.add_argument("--llm-base-url", default="", help="LLM base URL (overrides config)")
+    mcp_llm.add_argument("--llm-model", default=None, help="LLM model name (overrides config)")
+    mcp_llm.add_argument(
+        "--llm-summarize-model",
+        default="",
+        help="Optional dedicated model for summarize_query (overrides config)",
+    )
+    mcp_llm.add_argument(
+        "--llm-api-key",
+        default="",
+        help="API key for OpenAI-compatible providers (overrides config)",
+    )
+    mcp_llm.add_argument(
+        "--llm-timeout",
+        type=int,
+        default=None,
+        help="LLM request timeout in seconds (overrides config)",
     )
 
     # --- review ---
@@ -838,7 +865,8 @@ def cmd_mcp(args: argparse.Namespace) -> int:
     from mindforge.mcp.server import create_server
 
     config = MindForgeConfig(output_dir=args.output)
-    server = create_server(config)
+    file_cfg = _load_merged_config(args)
+    server = create_server(config, file_cfg=file_cfg)
     server.run()
     return 0
 
