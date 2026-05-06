@@ -1,9 +1,15 @@
 """Configuration for the MindForge pipeline."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from mindforge.paths import MindForgePaths
+
+if TYPE_CHECKING:
+    from mindforge.embeddings.index import Embedder
 
 
 @dataclass
@@ -34,6 +40,9 @@ class MindForgeConfig:
     # Embeddings (optional)
     embedding_model: str = "all-MiniLM-L6-v2"
     use_embeddings: bool = False
+    # Optional pluggable embedder (e.g. Ollama, OpenAI-compat).
+    # When None, EmbeddingIndex falls back to sentence-transformers.
+    embedding_provider: Embedder | None = None
 
     # Multi-KB root (env/config precedence via MindForgePaths).
     # None → resolve lazily in __post_init__.

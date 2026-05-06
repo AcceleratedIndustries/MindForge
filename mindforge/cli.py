@@ -17,8 +17,33 @@ from typing import Any
 from mindforge import __version__
 from mindforge.config import MindForgeConfig
 from mindforge.distillation.concept import Concept, ConceptStore
+from mindforge.embeddings.index import Embedder
 from mindforge.pipeline import MindForgePipeline
 from mindforge.query.engine import RetrievalWeights
+
+
+def _build_embedder(args: argparse.Namespace) -> Embedder | None:
+    """Construct an embedding provider from CLI args. None means use the default
+    sentence-transformers path inside EmbeddingIndex."""
+    provider = getattr(args, "embedding_provider", "sentence-transformers")
+    if provider == "ollama":
+        from mindforge.embeddings.ollama_provider import OllamaEmbeddingProvider
+
+        return OllamaEmbeddingProvider(
+            base_url=args.embedding_base_url or "http://localhost:11434",
+            model=args.embedding_model or "nomic-embed-text",
+        )
+    if provider == "openai-compat":
+        from mindforge.embeddings.openai_compat_provider import (
+            OpenAICompatibleEmbeddingProvider,
+        )
+
+        return OpenAICompatibleEmbeddingProvider(
+            base_url=args.embedding_base_url or "http://localhost:8080/v1",
+            model=args.embedding_model or "text-embedding-3-small",
+            api_key=args.embedding_api_key,
+        )
+    return None
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -93,6 +118,30 @@ def _build_parser() -> argparse.ArgumentParser:
         help="API key for OpenAI-compatible providers",
     )
 
+    # Embedding provider options
+    emb_group = ingest.add_argument_group("Embedding provider")
+    emb_group.add_argument(
+        "--embedding-provider",
+        choices=["sentence-transformers", "ollama", "openai-compat"],
+        default="sentence-transformers",
+        help="Embedding provider (default: sentence-transformers)",
+    )
+    emb_group.add_argument(
+        "--embedding-base-url",
+        default="",
+        help="Base URL for ollama or openai-compat providers",
+    )
+    emb_group.add_argument(
+        "--embedding-model",
+        default="",
+        help="Embedding model name (provider-specific default if unset)",
+    )
+    emb_group.add_argument(
+        "--embedding-api-key",
+        default="",
+        help="API key for openai-compat provider",
+    )
+
     # --- query ---
     query = subparsers.add_parser(
         "query",
@@ -153,6 +202,28 @@ def _build_parser() -> argparse.ArgumentParser:
         help=(
             "Override default weights as comma-separated keyword,semantic,graph (e.g. 0.4,0.4,0.2)"
         ),
+    )
+    qemb_group = query.add_argument_group("Embedding provider")
+    qemb_group.add_argument(
+        "--embedding-provider",
+        choices=["sentence-transformers", "ollama", "openai-compat"],
+        default="sentence-transformers",
+        help="Embedding provider (default: sentence-transformers)",
+    )
+    qemb_group.add_argument(
+        "--embedding-base-url",
+        default="",
+        help="Base URL for ollama or openai-compat providers",
+    )
+    qemb_group.add_argument(
+        "--embedding-model",
+        default="",
+        help="Embedding model name (provider-specific default if unset)",
+    )
+    qemb_group.add_argument(
+        "--embedding-api-key",
+        default="",
+        help="API key for openai-compat provider",
     )
 
     # --- list ---
@@ -319,6 +390,7 @@ def cmd_ingest(args: argparse.Namespace) -> int:
         llm_model=args.llm_model,
         llm_base_url=args.llm_base_url,
         llm_api_key=args.llm_api_key,
+        embedding_provider=_build_embedder(args) if args.embeddings else None,
     )
 
     print(f"MindForge v{__version__}")
@@ -372,6 +444,7 @@ def cmd_query(args: argparse.Namespace) -> int:
     config = MindForgeConfig(
         output_dir=args.output,
         use_embeddings=args.embeddings,
+        embedding_provider=_build_embedder(args) if args.embeddings else None,
     )
 
     pipeline = MindForgePipeline(config)

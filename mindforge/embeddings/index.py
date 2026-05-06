@@ -1,26 +1,40 @@
 """Embeddings index: optional semantic search over concepts using vector similarity.
 
-Uses sentence-transformers for encoding and FAISS for fast nearest-neighbor search.
-Falls back gracefully when dependencies are not installed.
+Uses FAISS for fast nearest-neighbor search. Vectors are produced by a swappable
+``Embedder`` (sentence-transformers by default; Ollama or OpenAI-compatible HTTP
+providers are also supported via ``embedder=`` constructor arg).
 """
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import Protocol, runtime_checkable
 
 from mindforge.distillation.concept import Concept
 
-if TYPE_CHECKING:
-    pass
+
+@runtime_checkable
+class Embedder(Protocol):
+    """Structural type for swappable embedding providers."""
+
+    def embed(self, text: str) -> list[float]: ...
+    def embed_batch(self, texts: list[str]) -> list[list[float]]: ...
 
 
-def _check_deps() -> bool:
-    """Check if embedding dependencies are available."""
+def _check_storage_deps() -> bool:
+    """Storage layer requires faiss + numpy regardless of embedder choice."""
     try:
         import faiss  # noqa: F401
         import numpy  # noqa: F401
+
+        return True
+    except ImportError:
+        return False
+
+
+def _check_sentence_transformers() -> bool:
+    try:
         import sentence_transformers  # noqa: F401
 
         return True
@@ -32,16 +46,25 @@ class EmbeddingIndex:
     """Semantic search index for MindForge concepts.
 
     Encodes concept definitions + explanations into dense vectors
-    and supports nearest-neighbor queries.
+    and supports nearest-neighbor queries. Vector generation is delegated
+    to ``embedder`` when provided; otherwise the legacy sentence-transformers
+    path is used.
     """
 
-    def __init__(self, model_name: str = "all-MiniLM-L6-v2") -> None:
+    def __init__(
+        self,
+        model_name: str = "all-MiniLM-L6-v2",
+        embedder: Embedder | None = None,
+    ) -> None:
         self._model_name = model_name
+        self._embedder = embedder
         self._model = None
         self._index = None
         self._slugs: list[str] = []
         self._dimension: int = 0
-        self._available = _check_deps()
+        has_storage = _check_storage_deps()
+        has_encoder = embedder is not None or _check_sentence_transformers()
+        self._available = has_storage and has_encoder
 
     @property
     def available(self) -> bool:
@@ -62,6 +85,29 @@ class EmbeddingIndex:
             parts.extend(concept.insights[:3])
         return " ".join(parts)
 
+    def _encode_batch(self, texts: list[str]):
+        import numpy as np
+
+        if self._embedder is not None:
+            raw = self._embedder.embed_batch(texts)
+            return np.array(raw, dtype=np.float32)
+        self._ensure_model()
+        if self._model is None:
+            raise RuntimeError("Embedding model failed to load.")
+        encoded = self._model.encode(texts, show_progress_bar=False)
+        return np.array(encoded, dtype=np.float32)
+
+    def _encode_one(self, text: str):
+        import numpy as np
+
+        if self._embedder is not None:
+            return np.array([self._embedder.embed(text)], dtype=np.float32)
+        self._ensure_model()
+        if self._model is None:
+            raise RuntimeError("Embedding model failed to load.")
+        encoded = self._model.encode([text])
+        return np.array(encoded, dtype=np.float32)
+
     def build(self, concepts: list[Concept]) -> None:
         """Build the index from a list of concepts."""
         if not self._available:
@@ -70,16 +116,10 @@ class EmbeddingIndex:
         import faiss
         import numpy as np
 
-        self._ensure_model()
-        if self._model is None:
-            raise RuntimeError("Embedding model failed to load.")
-
         texts = [self._concept_text(c) for c in concepts]
         self._slugs = [c.slug for c in concepts]
 
-        # Encode all concepts
-        embeddings = self._model.encode(texts, show_progress_bar=False)
-        embeddings = np.array(embeddings, dtype=np.float32)
+        embeddings = self._encode_batch(texts)
 
         # Normalize for cosine similarity
         norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
@@ -89,8 +129,9 @@ class EmbeddingIndex:
         self._dimension = embeddings.shape[1]
 
         # Build FAISS index
-        self._index = faiss.IndexFlatIP(self._dimension)
-        self._index.add(embeddings)
+        faiss_index = faiss.IndexFlatIP(self._dimension)
+        faiss_index.add(embeddings)
+        self._index = faiss_index
 
     def query(self, text: str, top_k: int = 5) -> list[tuple[str, float]]:
         """Query the index with natural language. Returns (slug, score) pairs."""
@@ -99,11 +140,7 @@ class EmbeddingIndex:
 
         import numpy as np
 
-        self._ensure_model()
-
-        # Encode query
-        query_embedding = self._model.encode([text])
-        query_embedding = np.array(query_embedding, dtype=np.float32)
+        query_embedding = self._encode_one(text)
         norm = np.linalg.norm(query_embedding)
         if norm > 0:
             query_embedding = query_embedding / norm
@@ -136,9 +173,13 @@ class EmbeddingIndex:
         (directory / "metadata.json").write_text(json.dumps(metadata, indent=2))
 
     @classmethod
-    def load(cls, directory: Path) -> EmbeddingIndex:
-        """Load an index from disk."""
-        index = cls()
+    def load(
+        cls,
+        directory: Path,
+        embedder: Embedder | None = None,
+    ) -> EmbeddingIndex:
+        """Load an index from disk. Pass ``embedder`` to query without sentence-transformers."""
+        index = cls(embedder=embedder)
         if not index._available:
             return index
 
