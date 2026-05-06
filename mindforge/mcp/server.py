@@ -585,6 +585,66 @@ SYNTHESIS_TOOLS: list[Tool] = [
             "required": ["question"],
         },
     ),
+    Tool(
+        name="explain_concept",
+        description=(
+            "Return a compressed prose explanation of a concept by slug or name. "
+            "depth='brief' skips the LLM (always available); 'standard' and "
+            "'detailed' paraphrase via the LLM."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "concept": {"type": "string", "description": "Concept slug or name"},
+                "depth": {
+                    "type": "string",
+                    "enum": ["brief", "standard", "detailed"],
+                    "default": "standard",
+                },
+            },
+            "required": ["concept"],
+        },
+    ),
+    Tool(
+        name="compare_concepts",
+        description=(
+            "LLM-synthesized prose comparison of 2+ concepts plus the relationship "
+            "types between them already present in the graph."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "concepts": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "minItems": 2,
+                },
+                "aspect": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Optional comparison angle (e.g. 'failure modes')",
+                },
+            },
+            "required": ["concepts"],
+        },
+    ),
+    Tool(
+        name="path_between",
+        description=(
+            "Shortest concept chain between two slugs (treating edges as "
+            "undirected) with relationship types along the way and an "
+            "LLM-generated prose narrative."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "from_concept": {"type": "string"},
+                "to_concept": {"type": "string"},
+                "max_hops": {"type": "integer", "default": 4},
+            },
+            "required": ["from_concept", "to_concept"],
+        },
+    ),
 ]
 
 ALL_TOOLS = KB_TOOLS + SEARCH_TOOLS + CONCEPT_TOOLS + SYNTHESIS_TOOLS
@@ -605,6 +665,31 @@ def _resolve_slug(store, name: str) -> str:
 
 
 # --- Tool Handlers ---
+
+
+def _require_loaded_kb(
+    manager: MultiKBManager,
+) -> KnowledgeBase | list[TextContent | ImageContent | EmbeddedResource]:
+    """Return the active KB, or a TextContent error reply if unavailable.
+
+    Centralizes the "select_kb first" / "kb_unloaded" responses that every
+    synthesis tool needs. Callers should ``isinstance(result, list)`` to
+    detect the error path.
+    """
+    try:
+        kb = manager.require_active()
+    except RuntimeError as e:
+        return [TextContent(type="text", text=str(e))]
+    if kb.store is None or kb.graph is None:
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps(
+                    {"error": "kb_unloaded", "message": "Active KB has no concepts/graph."}
+                ),
+            )
+        ]
+    return kb
 
 
 @app.call_tool()  # type: ignore[untyped-decorator]
@@ -903,22 +988,13 @@ async def handle_tool(
         client = _get_llm_client()
         if not client.available:
             return synthesis_unavailable_response(cfg)
-        try:
-            kb = manager.require_active()
-        except RuntimeError as e:
-            return [TextContent(type="text", text=str(e))]
-        if kb.store is None or kb.graph is None:
-            return [
-                TextContent(
-                    type="text",
-                    text=json.dumps(
-                        {"error": "kb_unloaded", "message": "Active KB has no concepts/graph."}
-                    ),
-                )
-            ]
+        kb_or_err = _require_loaded_kb(manager)
+        if isinstance(kb_or_err, list):
+            return kb_or_err
+        kb = kb_or_err
         text = handle_summarize_query(
-            store=kb.store,
-            graph=kb.graph,
+            store=kb.store,  # type: ignore[arg-type]
+            graph=kb.graph,  # type: ignore[arg-type]
             llm_client=client,
             question=arguments["question"],
             top_k=arguments.get("top_k", 5),
@@ -926,6 +1002,67 @@ async def handle_tool(
             max_concepts=arguments.get("max_concepts", 5),
             focus_tags=arguments.get("focus_tags"),
             include_provenance=arguments.get("include_provenance", False),
+        )
+        return [TextContent(type="text", text=text)]
+
+    elif name == "explain_concept":
+        from mindforge.mcp.tools.explain_concept import handle_explain_concept
+
+        depth = arguments.get("depth", "standard")
+        cfg = cast(ConfigFile, _runtime["config"])
+        client = _get_llm_client()
+        if depth != "brief" and not client.available:
+            return synthesis_unavailable_response(cfg)
+        kb_or_err = _require_loaded_kb(manager)
+        if isinstance(kb_or_err, list):
+            return kb_or_err
+        kb = kb_or_err
+        text = handle_explain_concept(
+            store=kb.store,  # type: ignore[arg-type]
+            graph=kb.graph,  # type: ignore[arg-type]
+            llm_client=client,
+            concept=arguments["concept"],
+            depth=depth,
+        )
+        return [TextContent(type="text", text=text)]
+
+    elif name == "compare_concepts":
+        from mindforge.mcp.tools.compare_concepts import handle_compare_concepts
+
+        cfg = cast(ConfigFile, _runtime["config"])
+        client = _get_llm_client()
+        if not client.available:
+            return synthesis_unavailable_response(cfg)
+        kb_or_err = _require_loaded_kb(manager)
+        if isinstance(kb_or_err, list):
+            return kb_or_err
+        kb = kb_or_err
+        text = handle_compare_concepts(
+            store=kb.store,  # type: ignore[arg-type]
+            graph=kb.graph,  # type: ignore[arg-type]
+            llm_client=client,
+            concepts=arguments.get("concepts", []),
+            aspect=arguments.get("aspect", ""),
+        )
+        return [TextContent(type="text", text=text)]
+
+    elif name == "path_between":
+        from mindforge.mcp.tools.path_between import handle_path_between
+
+        # path_between still returns the path even when the LLM is down — only
+        # the narrative degrades. So no synthesis-unavailable short-circuit.
+        client = _get_llm_client()
+        kb_or_err = _require_loaded_kb(manager)
+        if isinstance(kb_or_err, list):
+            return kb_or_err
+        kb = kb_or_err
+        text = handle_path_between(
+            store=kb.store,  # type: ignore[arg-type]
+            graph=kb.graph,  # type: ignore[arg-type]
+            llm_client=client,
+            from_concept=arguments["from_concept"],
+            to_concept=arguments["to_concept"],
+            max_hops=arguments.get("max_hops", 4),
         )
         return [TextContent(type="text", text=text)]
 
