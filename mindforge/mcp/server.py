@@ -24,8 +24,10 @@ from mcp.types import (
 )
 
 from mindforge.config import MindForgeConfig
+from mindforge.config_file import ConfigFile
 from mindforge.distillation.concept import Concept, ConceptStore
 from mindforge.graph.builder import KnowledgeGraph
+from mindforge.llm.client import LLMClient, LLMConfig
 from mindforge.mcp.adapter import get_adapter
 from mindforge.paths import MindForgePaths
 from mindforge.query.engine import QueryEngine
@@ -880,23 +882,91 @@ async def main():
         await app.run(read_stream, write_stream, app.create_initialization_options())
 
 
+# Runtime registry: mutable state populated by create_server() / start_server()
+# before main() runs. Synthesis tools (PR-C2/C3) read this to decide whether
+# the LLM-backed code path is enabled or whether to return an explicit
+# "synthesis_backend_unavailable" error response.
+_runtime: dict[str, object] = {
+    "config": ConfigFile(),
+    "synthesis_enabled": False,
+}
+
+
+def _check_llm_health(cfg: ConfigFile) -> bool:
+    """Ping the configured LLM endpoint. Used at startup to gate synthesis tools."""
+    client = LLMClient(
+        LLMConfig(
+            provider=cfg.llm.provider,
+            base_url=cfg.llm.base_url,
+            model=cfg.llm.model,
+            api_key=cfg.llm.api_key,
+            timeout=cfg.llm.timeout,
+        )
+    )
+    return client.available
+
+
+def synthesis_unavailable_response(cfg: ConfigFile) -> list[TextContent]:
+    """Standard error reply for synthesis tools when the LLM is unreachable."""
+    return [
+        TextContent(
+            type="text",
+            text=json.dumps(
+                {
+                    "error": "synthesis_backend_unavailable",
+                    "message": (
+                        f"LLM endpoint at {cfg.llm.base_url} unreachable; "
+                        "use raw `get_concept` or `get_subgraph` instead."
+                    ),
+                }
+            ),
+        )
+    ]
+
+
+def configure_runtime(cfg: ConfigFile) -> bool:
+    """Populate the runtime registry. Returns the synthesis_enabled flag."""
+    _runtime["config"] = cfg
+    enabled = _check_llm_health(cfg)
+    _runtime["synthesis_enabled"] = enabled
+    if not enabled:
+        print(
+            f"[mindforge mcp] LLM endpoint at {cfg.llm.base_url} unreachable. "
+            "Synthesis tools (summarize_query, explain_concept, compare_concepts, "
+            "path_between) will return an explicit error. Raw tools (get_concept, "
+            "get_subgraph, search) unaffected.",
+            file=sys.stderr,
+        )
+    return enabled
+
+
 class _ServerShim:
     """Sync wrapper returned by create_server() for CLI callers."""
 
-    def __init__(self, config: MindForgeConfig | None = None) -> None:
+    def __init__(
+        self,
+        config: MindForgeConfig | None = None,
+        file_cfg: ConfigFile | None = None,
+    ) -> None:
         self.config = config
+        self.file_cfg = file_cfg or ConfigFile()
 
     def run(self) -> None:
         import asyncio
 
+        configure_runtime(self.file_cfg)
         asyncio.run(main())
 
 
-def create_server(config: MindForgeConfig | None = None) -> _ServerShim:
-    """Return a runnable server object. ``config`` is currently unused;
-    the multi-KB server reads MINDFORGE_ROOT from the environment.
+def create_server(
+    config: MindForgeConfig | None = None,
+    file_cfg: ConfigFile | None = None,
+) -> _ServerShim:
+    """Return a runnable server object. ``config`` is the legacy KB-output
+    location (kept for compatibility); ``file_cfg`` carries the merged YAML
+    config used by synthesis tools.
     """
-    return _ServerShim(config)
+    return _ServerShim(config, file_cfg=file_cfg)
 
 
 if __name__ == "__main__":
