@@ -60,10 +60,11 @@ def test_parse_weights_non_numeric_raises() -> None:
 
 
 def test_cmd_query_passes_mode_and_weights_through(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
     """cmd_query should hand --mode and --weights to engine.search()."""
 
+    monkeypatch.setenv("MINDFORGE_CONFIG", str(tmp_path / "absent.yaml"))
     captured: dict[str, Any] = {}
 
     class _FakeEngine:
@@ -114,8 +115,9 @@ def test_cmd_query_passes_mode_and_weights_through(
 
 
 def test_cmd_query_default_mode_and_no_weights(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
+    monkeypatch.setenv("MINDFORGE_CONFIG", str(tmp_path / "absent.yaml"))
     captured: dict[str, Any] = {}
 
     class _FakeEngine:
@@ -155,4 +157,8 @@ def test_cmd_query_default_mode_and_no_weights(
     )
     assert cmd_query(args) == 0
     assert captured["mode"] == "hybrid"
-    assert captured["weights"] is None
+    # Without --weights, cmd_query now derives weights from the merged config.
+    # With no config file present, that's the dataclass default 0.4/0.4/0.2.
+    w = captured["weights"]
+    assert isinstance(w, RetrievalWeights)
+    assert (w.keyword, w.semantic, w.graph) == (0.4, 0.4, 0.2)
