@@ -2,12 +2,12 @@
 
 Two interventions:
 
-1. Content tagging — every tool wraps user-derived content in
+1. Content tagging - every tool wraps user-derived content in
    ``<mindforge_retrieved_content>...</mindforge_retrieved_content>`` so
    the calling agent's system prompt can treat the body as data, not as
    trusted instructions.
 
-2. Hidden-Unicode stripping — remove zero-width / BOM / bidi-override /
+2. Hidden-Unicode stripping - remove zero-width / BOM / bidi-override /
    tag-block characters used for steganographic prompt injection.
 """
 
@@ -18,18 +18,17 @@ import re
 OPEN_TAG = "<mindforge_retrieved_content>"
 CLOSE_TAG = "</mindforge_retrieved_content>"
 
-# Hidden-Unicode ranges used for steganographic injection. Explicit \u
-# escapes keep the source reviewable — embedded invisible characters in
-# the regex literal would defeat the purpose.
-_HIDDEN_UNICODE = re.compile(
-    "["
-    "​-‏"  # ZWSP, ZWNJ, ZWJ, LRM, RLM
-    "‪-‮"  # bidi overrides (LRE, RLE, PDF, LRO, RLO)
-    "⁠-⁤"  # word joiner, invisible separators/times/plus
-    "﻿"  # byte order mark (zero-width no-break space)
-    "\U000e0000-\U000e007f"  # tag block
-    "]"
-)
+# Hidden-Unicode ranges used for steganographic injection. Encoded with
+# explicit escape sequences only - embedding the literal characters in the
+# regex source defeats the purpose (and bandit B613:trojansource rightly
+# flags any source file that contains them). Ranges:
+#
+#   U+200B-U+200F    ZWSP, ZWNJ, ZWJ, LRM, RLM
+#   U+202A-U+202E    bidi overrides (LRE, RLE, PDF, LRO, RLO)
+#   U+2060-U+2064    word joiner, invisible separator/times/plus/function
+#   U+FEFF           BOM (zero-width no-break space)
+#   U+E0000-U+E007F  tag block
+_HIDDEN_UNICODE = re.compile("[\u200b-\u200f\u202a-\u202e\u2060-\u2064\ufeff\U000e0000-\U000e007f]")
 
 
 def strip_hidden_unicode(text: str) -> str:
