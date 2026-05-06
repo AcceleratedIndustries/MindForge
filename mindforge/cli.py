@@ -395,6 +395,23 @@ def _build_parser() -> argparse.ArgumentParser:
         default=Path("output"),
     )
 
+    # --- config ---
+    config_p = subparsers.add_parser(
+        "config",
+        help="Show or initialize the MindForge config file",
+    )
+    config_sub = config_p.add_subparsers(dest="config_command")
+    config_sub.add_parser("show", help="Print the merged effective config")
+    config_init = config_sub.add_parser(
+        "init",
+        help="Write a commented config template to ~/.config/mindforge/config.yaml",
+    )
+    config_init.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite existing config file",
+    )
+
     return parser
 
 
@@ -799,6 +816,70 @@ def cmd_mcp(args: argparse.Namespace) -> int:
     return 0
 
 
+_CONFIG_TEMPLATE = """# MindForge config
+# See docs/superpowers/specs/2026-05-05-phase3-v0.3.0-design.md for the spec.
+
+llm:
+  provider: ollama          # ollama | openai
+  base_url: http://localhost:11434
+  model: qwen3:30b-a3b
+  keep_alive: -1
+  timeout: 120
+  api_key: ""
+  # Optional: route summarize_query to a bigger model. Useful for metered APIs.
+  # summarize_model: nemotron-3-super:latest
+
+embeddings:
+  provider: sentence-transformers   # sentence-transformers | ollama | openai-compat
+  base_url: ""
+  model: ""
+  api_key: ""
+
+retrieval:
+  weights:
+    keyword: 0.4
+    semantic: 0.4
+    graph: 0.2
+  seed_pool_size: 10
+  walk_depth: 2
+"""
+
+
+def cmd_config(args: argparse.Namespace) -> int:
+    import yaml
+
+    from mindforge.config_file import default_config_path, load_config
+
+    if args.config_command == "show":
+        p = default_config_path()
+        cfg = load_config(p)
+        source = str(p) if p.exists() else "(defaults — no config file found)"
+        print(f"# Loaded from: {source}\n")
+        out = {
+            "llm": cfg.llm.__dict__,
+            "embeddings": cfg.embeddings.__dict__,
+            "retrieval": cfg.retrieval.__dict__,
+        }
+        print(yaml.safe_dump(out, sort_keys=False), end="")
+        return 0
+
+    if args.config_command == "init":
+        p = default_config_path()
+        if p.exists() and not args.force:
+            print(
+                f"Config file already exists at {p}. Use --force to overwrite.",
+                file=sys.stderr,
+            )
+            return 1
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(_CONFIG_TEMPLATE)
+        print(f"Wrote template config to {p}")
+        return 0
+
+    print("Run 'mindforge config show' or 'mindforge config init'.", file=sys.stderr)
+    return 1
+
+
 def main() -> int:
     parser = _build_parser()
     args = parser.parse_args()
@@ -818,6 +899,7 @@ def main() -> int:
         "diff": cmd_diff,
         "list": cmd_list,
         "open": cmd_open,
+        "config": cmd_config,
     }
 
     handler = commands.get(args.command)
