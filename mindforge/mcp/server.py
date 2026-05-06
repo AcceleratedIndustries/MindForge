@@ -558,7 +558,35 @@ CONCEPT_TOOLS: list[Tool] = [
     ),
 ]
 
-ALL_TOOLS = KB_TOOLS + SEARCH_TOOLS + CONCEPT_TOOLS
+SYNTHESIS_TOOLS: list[Tool] = [
+    Tool(
+        name="summarize_query",
+        description=(
+            "Run hybrid retrieval + 1-hop graph traversal + LLM synthesis on a "
+            "natural-language question. Returns a prose answer plus "
+            "concepts_consulted and suggested_followup. Tier 3 — preferred for "
+            "open-ended questions."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "question": {"type": "string", "description": "Natural language question"},
+                "top_k": {"type": "integer", "default": 5},
+                "max_hops": {"type": "integer", "default": 2},
+                "max_concepts": {"type": "integer", "default": 5},
+                "focus_tags": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Optional tag filter (reserved)",
+                },
+                "include_provenance": {"type": "boolean", "default": False},
+            },
+            "required": ["question"],
+        },
+    ),
+]
+
+ALL_TOOLS = KB_TOOLS + SEARCH_TOOLS + CONCEPT_TOOLS + SYNTHESIS_TOOLS
 
 
 # --- Helper Functions ---
@@ -865,6 +893,40 @@ async def handle_tool(
         items = build_review_queue(kb.store)
         return [TextContent(type="text", text=json.dumps(items, indent=2))]
 
+    elif name == "summarize_query":
+        from mindforge.mcp.tools.summarize_query import handle_summarize_query
+
+        cfg = _runtime["config"]
+        assert isinstance(cfg, ConfigFile)
+        client = _get_llm_client()
+        if not client.available:
+            return synthesis_unavailable_response(cfg)
+        try:
+            kb = manager.require_active()
+        except RuntimeError as e:
+            return [TextContent(type="text", text=str(e))]
+        if kb.store is None or kb.graph is None:
+            return [
+                TextContent(
+                    type="text",
+                    text=json.dumps(
+                        {"error": "kb_unloaded", "message": "Active KB has no concepts/graph."}
+                    ),
+                )
+            ]
+        text = handle_summarize_query(
+            store=kb.store,
+            graph=kb.graph,
+            llm_client=client,
+            question=arguments["question"],
+            top_k=arguments.get("top_k", 5),
+            max_hops=arguments.get("max_hops", 2),
+            max_concepts=arguments.get("max_concepts", 5),
+            focus_tags=arguments.get("focus_tags"),
+            include_provenance=arguments.get("include_provenance", False),
+        )
+        return [TextContent(type="text", text=text)]
+
     else:
         return [TextContent(type="text", text=f"Unknown tool: {name}")]
 
@@ -889,7 +951,32 @@ async def main():
 _runtime: dict[str, object] = {
     "config": ConfigFile(),
     "synthesis_enabled": False,
+    "llm_client": None,
 }
+
+
+def _build_llm_client(cfg: ConfigFile) -> LLMClient:
+    return LLMClient(
+        LLMConfig(
+            provider=cfg.llm.provider,
+            base_url=cfg.llm.base_url,
+            model=cfg.llm.model,
+            api_key=cfg.llm.api_key,
+            timeout=cfg.llm.timeout,
+        )
+    )
+
+
+def _get_llm_client() -> LLMClient:
+    """Return the cached LLMClient, building one lazily if needed."""
+    client = _runtime.get("llm_client")
+    if isinstance(client, LLMClient):
+        return client
+    cfg = _runtime["config"]
+    assert isinstance(cfg, ConfigFile)
+    new_client = _build_llm_client(cfg)
+    _runtime["llm_client"] = new_client
+    return new_client
 
 
 def _check_llm_health(cfg: ConfigFile) -> bool:
@@ -906,7 +993,9 @@ def _check_llm_health(cfg: ConfigFile) -> bool:
     return client.available
 
 
-def synthesis_unavailable_response(cfg: ConfigFile) -> list[TextContent]:
+def synthesis_unavailable_response(
+    cfg: ConfigFile,
+) -> list[TextContent | ImageContent | EmbeddedResource]:
     """Standard error reply for synthesis tools when the LLM is unreachable."""
     return [
         TextContent(
@@ -927,6 +1016,7 @@ def synthesis_unavailable_response(cfg: ConfigFile) -> list[TextContent]:
 def configure_runtime(cfg: ConfigFile) -> bool:
     """Populate the runtime registry. Returns the synthesis_enabled flag."""
     _runtime["config"] = cfg
+    _runtime["llm_client"] = _build_llm_client(cfg)
     enabled = _check_llm_health(cfg)
     _runtime["synthesis_enabled"] = enabled
     if not enabled:
