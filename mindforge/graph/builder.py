@@ -131,6 +131,43 @@ class KnowledgeGraph:
                 connected.add(edge["source"])
         return list(connected)
 
+    def subgraph(
+        self,
+        center: str,
+        depth: int = 1,
+        edge_types: list[str] | None = None,
+    ) -> dict:
+        """Return a JSON-shape subgraph centered on ``center``, depth-limited.
+
+        The result has the form ``{"nodes": [{"id", "label"}, ...],
+        "edges": [{"source", "target", "type", "confidence"}, ...]}``.
+        Edges are kept directed; ``depth`` is measured against an undirected
+        projection so reachable concepts are included regardless of direction.
+        """
+        if self._graph is None or center not in self._graph:
+            return {"nodes": [], "edges": []}
+        nodes_in_radius = nx.single_source_shortest_path_length(
+            self._graph.to_undirected(),
+            center,
+            cutoff=depth,
+        )
+        sub = self._graph.subgraph(nodes_in_radius.keys())
+        edges: list[dict] = []
+        for u, v, data in sub.edges(data=True):
+            rel_type = data.get("type", "related_to")
+            if edge_types and rel_type not in edge_types:
+                continue
+            edges.append(
+                {
+                    "source": u,
+                    "target": v,
+                    "type": rel_type,
+                    "confidence": float(data.get("confidence", 1.0)),
+                }
+            )
+        nodes = [{"id": n, "label": sub.nodes[n].get("label", n)} for n in sub.nodes]
+        return {"nodes": nodes, "edges": edges}
+
     def shortest_paths(
         self,
         source: str,

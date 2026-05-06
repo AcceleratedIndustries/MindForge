@@ -645,6 +645,28 @@ SYNTHESIS_TOOLS: list[Tool] = [
             "required": ["from_concept", "to_concept"],
         },
     ),
+    Tool(
+        name="get_subgraph",
+        description=(
+            "Raw graph delivery (Tier 4). Returns the n-hop subgraph centered "
+            "on a slug as both a JSON payload (nodes, edges) and a markdown "
+            "rendering. No LLM. Prefer summarize_query / explain_concept / "
+            "compare_concepts / path_between for synthesized output."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "center": {"type": "string", "description": "Center concept slug"},
+                "depth": {"type": "integer", "default": 1},
+                "edge_types": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Optional whitelist of relationship types",
+                },
+            },
+            "required": ["center"],
+        },
+    ),
 ]
 
 ALL_TOOLS = KB_TOOLS + SEARCH_TOOLS + CONCEPT_TOOLS + SYNTHESIS_TOOLS
@@ -1063,6 +1085,23 @@ async def handle_tool(
             from_concept=arguments["from_concept"],
             to_concept=arguments["to_concept"],
             max_hops=arguments.get("max_hops", 4),
+        )
+        return [TextContent(type="text", text=text)]
+
+    elif name == "get_subgraph":
+        from mindforge.mcp.tools.subgraph import handle_get_subgraph
+
+        # No LLM dependency — raw graph delivery.
+        kb_or_err = _require_loaded_kb(manager)
+        if isinstance(kb_or_err, list):
+            return kb_or_err
+        kb = kb_or_err
+        text = handle_get_subgraph(
+            store=kb.store,  # type: ignore[arg-type]
+            graph=kb.graph,  # type: ignore[arg-type]
+            center=arguments["center"],
+            depth=arguments.get("depth", 1),
+            edge_types=arguments.get("edge_types"),
         )
         return [TextContent(type="text", text=text)]
 
