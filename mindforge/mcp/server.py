@@ -13,6 +13,7 @@ import shutil
 import sys
 from datetime import datetime
 from pathlib import Path
+from typing import cast
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
@@ -896,8 +897,9 @@ async def handle_tool(
     elif name == "summarize_query":
         from mindforge.mcp.tools.summarize_query import handle_summarize_query
 
-        cfg = _runtime["config"]
-        assert isinstance(cfg, ConfigFile)
+        # _runtime["config"] is always populated as a ConfigFile by
+        # configure_runtime; cast keeps mypy happy without a runtime assert.
+        cfg = cast(ConfigFile, _runtime["config"])
         client = _get_llm_client()
         if not client.available:
             return synthesis_unavailable_response(cfg)
@@ -972,8 +974,7 @@ def _get_llm_client() -> LLMClient:
     client = _runtime.get("llm_client")
     if isinstance(client, LLMClient):
         return client
-    cfg = _runtime["config"]
-    assert isinstance(cfg, ConfigFile)
+    cfg = cast(ConfigFile, _runtime["config"])
     new_client = _build_llm_client(cfg)
     _runtime["llm_client"] = new_client
     return new_client
