@@ -34,6 +34,12 @@ class LLMConfig:
     # pins the model for the lifetime of the Ollama server; a duration
     # string like "30m" is also accepted. Ignored by OpenAI provider.
     ollama_keep_alive: int | str = -1
+    # Ollama `think` parameter (Ollama 0.6.x+). When False, reasoning models
+    # like qwen3 skip the chain-of-thought phase, which is roughly 5x faster
+    # for structured extraction tasks where the deliberation isn't worth its
+    # cost. None = don't pass the parameter (preserve server default).
+    # Ignored by OpenAI provider.
+    ollama_think: bool | None = None
 
     def __post_init__(self) -> None:
         if not self.base_url:
@@ -123,6 +129,8 @@ class LLMClient:
             payload["system"] = system
         if response_format:
             payload["format"] = response_format
+        if self.config.ollama_think is not None:
+            payload["think"] = self.config.ollama_think
 
         return self._post_json(url, payload, self._parse_ollama_response)
 

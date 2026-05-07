@@ -34,6 +34,14 @@ class LLMConfigSection:
     keep_alive: int | str = -1
     timeout: int = 120
     api_key: str = ""
+    # Controls the Ollama `think` parameter on synthesis-tool requests
+    # (summarize_query, explain_concept, compare_concepts, path_between).
+    # When True, reasoning models (qwen3, deepseek-r1, gpt-oss, ...) use
+    # chain-of-thought before answering, which can improve prose synthesis.
+    # When False, they skip thinking. None = leave at server default.
+    # Extraction always disables thinking (hardcoded) — that path fills a
+    # fixed JSON schema where deliberation isn't worth its cost.
+    synthesis_think: bool | None = None
 
 
 @dataclass

@@ -281,6 +281,42 @@ class TestLLMConfig:
         config = LLMConfig(base_url="http://my-server:8080")
         assert config.base_url == "http://my-server:8080"
 
+    def test_ollama_think_default_is_none(self):
+        config = LLMConfig()
+        assert config.ollama_think is None
+
+
+class TestOllamaPayload:
+    """Verify the Ollama request payload reflects config flags."""
+
+    def _capture_payload(self, config: LLMConfig) -> dict:
+        client = LLMClient(config)
+        captured: dict = {}
+
+        def fake_post(url: str, payload: dict, parser):
+            captured.update(payload)
+            return LLMResponse(content='{"concepts": []}', success=True)
+
+        client._post_json = fake_post  # type: ignore[method-assign]
+        client.generate("test prompt", system="sys", response_format="json")
+        return captured
+
+    def test_think_omitted_when_none(self):
+        payload = self._capture_payload(LLMConfig(ollama_think=None))
+        assert "think" not in payload
+
+    def test_think_false_in_payload(self):
+        payload = self._capture_payload(LLMConfig(ollama_think=False))
+        assert payload["think"] is False
+
+    def test_think_true_in_payload(self):
+        payload = self._capture_payload(LLMConfig(ollama_think=True))
+        assert payload["think"] is True
+
+    def test_keep_alive_in_payload(self):
+        payload = self._capture_payload(LLMConfig(ollama_keep_alive="30m"))
+        assert payload["keep_alive"] == "30m"
+
 
 class TestLLMClient:
     def test_unavailable_server(self):
