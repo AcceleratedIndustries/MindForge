@@ -93,7 +93,6 @@ class PipelineResult:
     updated: int = 0
     unchanged: int = 0
     removed: int = 0
-    # Incremental tracking
     skipped: bool = False
     files_new: int = 0
     files_modified: int = 0
@@ -106,9 +105,8 @@ class PipelineResult:
             "MindForge Pipeline Complete",
             "=" * 40,
             f"  Extraction method:       {self.extraction_method}",
-            f"  Files (new/mod/unch/del):"
-            f"  {self.files_new}/{self.files_modified}/"
-            f"{self.files_unchanged}/{self.files_deleted}",
+            f"  Files (new/mod/unch/del): "
+            f"{self.files_new}/{self.files_modified}/{self.files_unchanged}/{self.files_deleted}",
             f"  Concepts extracted:      {self.concepts_extracted}",
             f"  After deduplication:     {self.concepts_after_dedup}",
             f"  Soft-deleted concepts:   {self.concepts_soft_deleted}",
@@ -326,7 +324,6 @@ class MindForgePipeline:
         # Save updated manifest (now with links)
         self.store.save(manifest_path)
 
-        # Persist file hashes for next run.
         for transcript in transcripts:
             p = Path(transcript.source_file)
             hash_store.update(p, hash_store.hasher.hash_file(p))
