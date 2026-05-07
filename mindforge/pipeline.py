@@ -406,6 +406,9 @@ class MindForgePipeline:
             model=self.config.llm_model,
             base_url=self.config.llm_base_url,
             api_key=self.config.llm_api_key,
+            timeout=self.config.llm_timeout,
+            ollama_keep_alive=self.config.llm_keep_alive,
+            ollama_think=self.config.llm_think,
         )
         client = LLMClient(llm_config)
 

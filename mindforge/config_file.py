@@ -34,6 +34,10 @@ class LLMConfigSection:
     keep_alive: int | str = -1
     timeout: int = 120
     api_key: str = ""
+    # When False, reasoning models (qwen3, deepseek-r1, gpt-oss, ...) skip
+    # the chain-of-thought phase. Roughly 5x faster on structured-extraction
+    # workloads. None = leave at server default. Ollama-only.
+    think: bool | None = None
 
 
 @dataclass

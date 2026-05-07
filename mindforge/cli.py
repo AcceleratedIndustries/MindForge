@@ -518,6 +518,9 @@ def cmd_ingest(args: argparse.Namespace) -> int:
         llm_model=file_cfg.llm.model,
         llm_base_url=file_cfg.llm.base_url,
         llm_api_key=file_cfg.llm.api_key,
+        llm_keep_alive=file_cfg.llm.keep_alive,
+        llm_timeout=file_cfg.llm.timeout,
+        llm_think=file_cfg.llm.think,
         embedding_provider=_build_embedder(file_cfg) if args.embeddings else None,
     )
 
@@ -933,6 +936,10 @@ llm:
   keep_alive: -1
   timeout: 120
   api_key: ""
+  # Reasoning models (qwen3, deepseek-r1, gpt-oss): set think=false to skip the
+  # chain-of-thought phase. Roughly 5x faster for structured-extraction loads.
+  # Omit (or null) to leave at the server default.
+  # think: false
   # Optional: route summarize_query to a bigger model. Useful for metered APIs.
   # summarize_model: nemotron-3-super:latest
 
