@@ -477,6 +477,31 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Overwrite existing config file",
     )
 
+    # --- prune ---
+    prune_p = subparsers.add_parser(
+        "prune",
+        help="Hard-delete soft-marked concepts and their on-disk artifacts",
+    )
+    prune_p.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Preview what would be removed without changing anything",
+    )
+    prune_p.add_argument(
+        "--older-than-days",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Only prune concepts soft-deleted at least N days ago",
+    )
+    prune_p.add_argument(
+        "--output",
+        "-o",
+        type=Path,
+        default=Path("output"),
+        help="Output directory (default: output)",
+    )
+
     return parser
 
 
@@ -962,6 +987,25 @@ def cmd_config(args: argparse.Namespace) -> int:
     return 1
 
 
+def cmd_prune(args: argparse.Namespace) -> int:
+    """Hard-delete soft-marked concepts."""
+    from mindforge.prune import prune_orphans
+
+    config = MindForgeConfig(output_dir=args.output)
+    summary = prune_orphans(config, dry_run=args.dry_run, older_than_days=args.older_than_days)
+
+    if args.dry_run:
+        print(f"Would remove {summary.would_remove} soft-deleted concept(s):")
+        for slug in summary.slugs:
+            print(f"  - {slug}")
+        print("Re-run without --dry-run to apply.")
+    else:
+        print(f"Removed {summary.removed} soft-deleted concept(s).")
+        for slug in summary.slugs:
+            print(f"  - {slug}")
+    return 0
+
+
 def main() -> int:
     parser = _build_parser()
     args = parser.parse_args()
@@ -982,6 +1026,7 @@ def main() -> int:
         "list": cmd_list,
         "open": cmd_open,
         "config": cmd_config,
+        "prune": cmd_prune,
     }
 
     handler = commands.get(args.command)
