@@ -79,3 +79,12 @@ def test_merge_with_both_deleted_keeps_earlier_timestamp() -> None:
     merged = a.merge_with(b)
     assert merged.status == "deleted"
     assert merged.deleted_at == earlier
+
+
+def test_merge_with_both_deleted_no_timestamps_is_safe() -> None:
+    """Two deleted concepts without timestamps merge to deleted with no timestamp."""
+    a = Concept(name="X", definition="d", explanation="e", status="deleted")
+    b = Concept(name="X", definition="d", explanation="e", status="deleted")
+    merged = a.merge_with(b)
+    assert merged.status == "deleted"
+    assert merged.deleted_at is None

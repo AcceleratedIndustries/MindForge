@@ -73,7 +73,7 @@ class Concept:
     links: list[str] = field(default_factory=list)  # wiki-link targets (slugs)
     relationships: list[Relationship] = field(default_factory=list)
     sources: list[SourceRef] = field(default_factory=list)
-    status: str = "active"  # active | conflicted | stale | orphaned
+    status: str = "active"  # active | conflicted | stale | orphaned | deleted
     conflicts: list[ConflictMarker] = field(default_factory=list)
     last_reinforced_at: str | None = None
     last_reviewed_at: str | None = None
