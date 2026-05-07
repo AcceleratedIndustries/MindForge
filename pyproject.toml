@@ -121,7 +121,6 @@ module = [
     "mindforge.llm.client",
     "mindforge.llm.extractor",
     "mindforge.graph.builder",
-    "mindforge.ingestion.incremental",
 ]
 disallow_untyped_defs = false
 disallow_untyped_calls = false
