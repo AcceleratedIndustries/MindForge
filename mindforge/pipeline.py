@@ -20,6 +20,7 @@ from mindforge.embeddings.index import EmbeddingIndex
 from mindforge.graph.builder import KnowledgeGraph
 from mindforge.ingestion.chunker import Chunk, chunk_turns
 from mindforge.ingestion.extractor import RawConcept, extract_concepts
+from mindforge.ingestion.file_hash_store import FileHashStore
 from mindforge.ingestion.parser import parse_all_transcripts
 from mindforge.linking.linker import detect_links
 from mindforge.llm.client import LLMClient, LLMConfig
@@ -92,14 +93,25 @@ class PipelineResult:
     updated: int = 0
     unchanged: int = 0
     removed: int = 0
+    # Incremental tracking
+    skipped: bool = False
+    files_new: int = 0
+    files_modified: int = 0
+    files_unchanged: int = 0
+    files_deleted: int = 0
+    concepts_soft_deleted: int = 0
 
     def summary(self) -> str:
         lines = [
             "MindForge Pipeline Complete",
             "=" * 40,
             f"  Extraction method:       {self.extraction_method}",
+            f"  Files (new/mod/unch/del):"
+            f"  {self.files_new}/{self.files_modified}/"
+            f"{self.files_unchanged}/{self.files_deleted}",
             f"  Concepts extracted:      {self.concepts_extracted}",
             f"  After deduplication:     {self.concepts_after_dedup}",
+            f"  Soft-deleted concepts:   {self.concepts_soft_deleted}",
             f"  Markdown files written:  {self.concept_files_written}",
             f"  Graph edges:             {self.edges_in_graph}",
             f"  Embeddings built:        "
@@ -137,6 +149,53 @@ class MindForgePipeline:
 
         total_turns = sum(len(t.turns) for t in transcripts)
         print(f"  Found {len(transcripts)} file(s), {total_turns} turns")
+
+        ingest_dir = self.config.output_dir / ".ingest"
+        hash_store = FileHashStore.load(ingest_dir, self.config.transcripts_dir)
+
+        on_disk_paths = {Path(t.source_file).resolve() for t in transcripts}
+        known = hash_store.known_paths()
+        deleted_paths = known - on_disk_paths
+
+        new_files: list[Path] = []
+        modified_files: list[Path] = []
+        unchanged_files: list[Path] = []
+        for transcript in transcripts:
+            p = Path(transcript.source_file)
+            status = hash_store.status_of(p)
+            if status.is_new:
+                new_files.append(p)
+            elif status.is_modified:
+                modified_files.append(p)
+            else:
+                unchanged_files.append(p)
+
+        cache_existed = (ingest_dir / FileHashStore.HASH_FILE_NAME).exists()
+        no_changes = not new_files and not modified_files and not deleted_paths
+
+        if cache_existed and no_changes and not dry_run:
+            print(f"  Files (new/mod/unch/del): 0/0/{len(unchanged_files)}/0")
+            print("  Nothing to do.")
+            self._load_state()
+            return PipelineResult(
+                concepts_extracted=0,
+                concepts_after_dedup=0,
+                concept_files_written=0,
+                edges_in_graph=0,
+                embeddings_built=self.embedding_index is not None,
+                extraction_method="incremental-skip",
+                skipped=True,
+                files_new=0,
+                files_modified=0,
+                files_unchanged=len(unchanged_files),
+                files_deleted=0,
+            )
+
+        print(
+            f"  Files (new/mod/unch/del): "
+            f"{len(new_files)}/{len(modified_files)}/"
+            f"{len(unchanged_files)}/{len(deleted_paths)}"
+        )
 
         # === Stage 2: Chunking & Extraction ===
         print("[2/6] Chunking and extracting concepts...")
@@ -208,6 +267,10 @@ class MindForgePipeline:
                 updated=updated_count,
                 unchanged=unchanged_count,
                 removed=removed_count,
+                files_new=len(new_files),
+                files_modified=len(modified_files),
+                files_unchanged=len(unchanged_files),
+                files_deleted=len(deleted_paths),
             )
 
         # Save manifest
@@ -263,6 +326,14 @@ class MindForgePipeline:
         # Save updated manifest (now with links)
         self.store.save(manifest_path)
 
+        # Persist file hashes for next run.
+        for transcript in transcripts:
+            p = Path(transcript.source_file)
+            hash_store.update(p, hash_store.hasher.hash_file(p))
+        for p in deleted_paths:
+            hash_store.forget(p)
+        hash_store.save()
+
         return PipelineResult(
             concepts_extracted=len(raw_concepts),
             concepts_after_dedup=len(deduped),
@@ -270,6 +341,10 @@ class MindForgePipeline:
             edges_in_graph=stats["edges"],
             embeddings_built=embeddings_built,
             extraction_method=extraction_method,
+            files_new=len(new_files),
+            files_modified=len(modified_files),
+            files_unchanged=len(unchanged_files),
+            files_deleted=len(deleted_paths),
         )
 
     def query(self, question: str, top_k: int = 5) -> str:
