@@ -41,7 +41,8 @@ def test_embedding_index_build_skips_deleted() -> None:
     store.add(_make("A"))
     store.add(_make("B", status="deleted"))
     index = EmbeddingIndex("all-MiniLM-L6-v2")
-    index.build([c for c in store.all() if c.status == "active"])
+    # Pass raw store contents (including deleted) so build's internal filter runs.
+    index.build(store.all())
     if index.available:
         assert "b" not in index._slugs  # noqa: SLF001
         assert "a" in index._slugs  # noqa: SLF001

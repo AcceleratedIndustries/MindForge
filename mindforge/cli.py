@@ -566,17 +566,16 @@ def cmd_query(args: argparse.Namespace) -> int:
     )
 
     # Apply filters post-search so semantic scoring isn't distorted.
-    include_deleted = getattr(args, "include_deleted", False)
-    if args.tag or args.min_confidence is not None or args.since or not include_deleted:
-        kept_concepts = filter_concepts(
-            [r.concept for r in results],
-            tag=args.tag,
-            min_confidence=args.min_confidence,
-            since=args.since,
-            include_deleted=include_deleted,
-        )
-        kept_slugs = {c.slug for c in kept_concepts}
-        results = [r for r in results if r.concept.slug in kept_slugs]
+    include_deleted = args.include_deleted
+    kept_concepts = filter_concepts(
+        [r.concept for r in results],
+        tag=args.tag,
+        min_confidence=args.min_confidence,
+        since=args.since,
+        include_deleted=include_deleted,
+    )
+    kept_slugs = {c.slug for c in kept_concepts}
+    results = [r for r in results if r.concept.slug in kept_slugs]
 
     print(pipeline.query_engine.format_results(results))
     return 0
@@ -599,7 +598,7 @@ def cmd_list(args: argparse.Namespace) -> int:
         tag=args.tag,
         min_confidence=args.min_confidence,
         since=args.since,
-        include_deleted=getattr(args, "include_deleted", False),
+        include_deleted=args.include_deleted,
     )
     if args.limit:
         results = results[: args.limit]
@@ -833,7 +832,7 @@ def cmd_show(args: argparse.Namespace) -> int:
     if not concept:
         print(f"Unknown concept: {args.slug}", file=sys.stderr)
         return 1
-    if not getattr(args, "include_deleted", False) and concept.status == "deleted":
+    if not args.include_deleted and concept.status == "deleted":
         print(f"Unknown concept: {args.slug}", file=sys.stderr)
         return 1
 

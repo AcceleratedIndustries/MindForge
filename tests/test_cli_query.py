@@ -101,6 +101,7 @@ def test_cmd_query_passes_mode_and_weights_through(
         tag=None,
         min_confidence=None,
         since=None,
+        include_deleted=False,
         mode="keyword",
         weights="0.7,0.0,0.3",
     )
@@ -152,6 +153,7 @@ def test_cmd_query_default_mode_and_no_weights(
         tag=None,
         min_confidence=None,
         since=None,
+        include_deleted=False,
         mode="hybrid",
         weights=None,
     )
