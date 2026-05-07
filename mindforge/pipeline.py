@@ -195,11 +195,43 @@ class MindForgePipeline:
             f"{len(unchanged_files)}/{len(deleted_paths)}"
         )
 
+        is_incremental = cache_existed and not getattr(self, "_force_full", False)
+
+        files_to_process: list[Path]
+        soft_deleted_count = 0
+        if is_incremental:
+            files_to_process = new_files + modified_files
+            self.store = ConceptStore.load(self.config.output_dir / "concepts.json")
+
+            drop_paths = {p.resolve() for p in modified_files} | {
+                p.resolve() for p in deleted_paths
+            }
+            now_iso_drop = datetime.now(timezone.utc).isoformat()
+            for _slug, concept in list(self.store.concepts.items()):
+                concept.source_files = [
+                    sf for sf in concept.source_files if Path(sf).resolve() not in drop_paths
+                ]
+                concept.sources = [
+                    s
+                    for s in concept.sources
+                    if Path(s.transcript_path).resolve() not in drop_paths
+                ]
+                if not concept.source_files and concept.status != "deleted":
+                    concept.status = "deleted"
+                    concept.deleted_at = now_iso_drop
+                    soft_deleted_count += 1
+        else:
+            files_to_process = [Path(t.source_file) for t in transcripts]
+
+        process_set = {p.resolve() for p in files_to_process}
+        transcripts_to_extract = [
+            t for t in transcripts if Path(t.source_file).resolve() in process_set
+        ]
+
         # === Stage 2: Chunking & Extraction ===
         print("[2/6] Chunking and extracting concepts...")
         all_chunks = []
-        for transcript in transcripts:
-            # Focus on assistant turns (where knowledge lives)
+        for transcript in transcripts_to_extract:
             chunks = chunk_turns(transcript.assistant_turns)
             all_chunks.extend(chunks)
         print(f"  Generated {len(all_chunks)} semantic chunks")
@@ -269,6 +301,7 @@ class MindForgePipeline:
                 files_modified=len(modified_files),
                 files_unchanged=len(unchanged_files),
                 files_deleted=len(deleted_paths),
+                concepts_soft_deleted=soft_deleted_count,
             )
 
         # Save manifest
@@ -342,6 +375,7 @@ class MindForgePipeline:
             files_modified=len(modified_files),
             files_unchanged=len(unchanged_files),
             files_deleted=len(deleted_paths),
+            concepts_soft_deleted=soft_deleted_count,
         )
 
     def query(self, question: str, top_k: int = 5) -> str:

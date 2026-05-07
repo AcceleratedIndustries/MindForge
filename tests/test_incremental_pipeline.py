@@ -60,3 +60,99 @@ def test_rerun_with_no_changes_triggers_fast_path(
     assert result.files_unchanged == 1
     assert result.files_new == 0
     assert result.files_modified == 0
+
+
+def test_adding_new_transcript_preserves_old_concepts(
+    fixture_paths: tuple[Path, Path],
+) -> None:
+    transcripts_dir, output_dir = fixture_paths
+    _seed_transcripts(
+        transcripts_dir,
+        {
+            "a.md": "# Alpha\n\nAlpha is the first letter of the Greek alphabet.\n",
+        },
+    )
+
+    config = MindForgeConfig(transcripts_dir=transcripts_dir, output_dir=output_dir, use_llm=False)
+    MindForgePipeline(config).run()
+
+    from mindforge.distillation.concept import ConceptStore
+
+    first_store = ConceptStore.load(output_dir / "concepts.json")
+    first_slugs = set(first_store.slugs())
+    assert first_slugs, "first run should have produced some concepts"
+
+    (transcripts_dir / "b.md").write_text(
+        "# Beta\n\nBeta is the second letter of the Greek alphabet.\n",
+        encoding="utf-8",
+    )
+    result = MindForgePipeline(config).run()
+    assert result.skipped is False
+    assert result.files_new == 1
+    assert result.files_unchanged == 1
+
+    second_store = ConceptStore.load(output_dir / "concepts.json")
+    assert first_slugs.issubset(set(second_store.slugs())), (
+        "concepts from unchanged files should be preserved"
+    )
+
+
+def test_modifying_transcript_soft_marks_removed_concepts(
+    fixture_paths: tuple[Path, Path],
+) -> None:
+    transcripts_dir, output_dir = fixture_paths
+    _seed_transcripts(
+        transcripts_dir,
+        {
+            "a.md": (
+                "# Alpha\n\nAlpha is the first letter of the Greek alphabet.\n\n"
+                "# Beta\n\nBeta is the second letter of the Greek alphabet.\n"
+            ),
+        },
+    )
+
+    config = MindForgeConfig(transcripts_dir=transcripts_dir, output_dir=output_dir, use_llm=False)
+    MindForgePipeline(config).run()
+
+    from mindforge.distillation.concept import ConceptStore
+
+    first_store = ConceptStore.load(output_dir / "concepts.json")
+    assert "alpha" in first_store.concepts or "beta" in first_store.concepts
+
+    (transcripts_dir / "a.md").write_text(
+        "# Alpha\n\nAlpha is the first letter of the Greek alphabet.\n",
+        encoding="utf-8",
+    )
+    result = MindForgePipeline(config).run()
+    assert result.files_modified == 1
+
+    second_store = ConceptStore.load(output_dir / "concepts.json")
+    if "beta" in second_store.concepts:
+        assert second_store.concepts["beta"].status == "deleted"
+        assert second_store.concepts["beta"].deleted_at is not None
+
+
+def test_deleting_transcript_soft_marks_orphans(
+    fixture_paths: tuple[Path, Path],
+) -> None:
+    transcripts_dir, output_dir = fixture_paths
+    _seed_transcripts(
+        transcripts_dir,
+        {
+            "a.md": "# Alpha\n\nAlpha is the first letter of the Greek alphabet.\n",
+            "b.md": "# Beta\n\nBeta is the second letter of the Greek alphabet.\n",
+        },
+    )
+
+    config = MindForgeConfig(transcripts_dir=transcripts_dir, output_dir=output_dir, use_llm=False)
+    MindForgePipeline(config).run()
+
+    (transcripts_dir / "b.md").unlink()
+    result = MindForgePipeline(config).run()
+    assert result.files_deleted == 1
+
+    from mindforge.distillation.concept import ConceptStore
+
+    store = ConceptStore.load(output_dir / "concepts.json")
+    if "beta" in store.concepts:
+        assert store.concepts["beta"].status == "deleted"
