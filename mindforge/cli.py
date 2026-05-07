@@ -108,6 +108,11 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Preview diff against the existing KB without writing anything",
     )
+    ingest.add_argument(
+        "--full",
+        action="store_true",
+        help="Force a full rebuild, ignoring the incremental hash cache",
+    )
 
     # LLM extraction options
     llm_group = ingest.add_argument_group("LLM extraction")
@@ -223,6 +228,11 @@ def _build_parser() -> argparse.ArgumentParser:
             "Override default weights as comma-separated keyword,semantic,graph (e.g. 0.4,0.4,0.2)"
         ),
     )
+    query.add_argument(
+        "--include-deleted",
+        action="store_true",
+        help="Include soft-deleted concepts in results",
+    )
     qemb_group = query.add_argument_group("Embedding provider")
     qemb_group.add_argument(
         "--embedding-provider",
@@ -260,6 +270,11 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     lst.add_argument("--min-confidence", type=float, default=None)
     lst.add_argument("--limit", type=int, default=None)
+    lst.add_argument(
+        "--include-deleted",
+        action="store_true",
+        help="Include soft-deleted concepts in results",
+    )
     lst.add_argument(
         "--output",
         "-o",
@@ -415,6 +430,11 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Print the concept markdown file as-is",
     )
     show.add_argument(
+        "--include-deleted",
+        action="store_true",
+        help="Include soft-deleted concepts in results",
+    )
+    show.add_argument(
         "--output",
         "-o",
         type=Path,
@@ -457,6 +477,31 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Overwrite existing config file",
     )
 
+    # --- prune ---
+    prune_p = subparsers.add_parser(
+        "prune",
+        help="Hard-delete soft-marked concepts and their on-disk artifacts",
+    )
+    prune_p.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Preview what would be removed without changing anything",
+    )
+    prune_p.add_argument(
+        "--older-than-days",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Only prune concepts soft-deleted at least N days ago",
+    )
+    prune_p.add_argument(
+        "--output",
+        "-o",
+        type=Path,
+        default=Path("output"),
+        help="Output directory (default: output)",
+    )
+
     return parser
 
 
@@ -484,6 +529,8 @@ def cmd_ingest(args: argparse.Namespace) -> int:
     print()
 
     pipeline = MindForgePipeline(config)
+    if args.full:
+        pipeline._force_full = True
     result = pipeline.run(dry_run=args.dry_run)
 
     print()
@@ -551,15 +598,16 @@ def cmd_query(args: argparse.Namespace) -> int:
     )
 
     # Apply filters post-search so semantic scoring isn't distorted.
-    if args.tag or args.min_confidence is not None or args.since:
-        kept_concepts = filter_concepts(
-            [r.concept for r in results],
-            tag=args.tag,
-            min_confidence=args.min_confidence,
-            since=args.since,
-        )
-        kept_slugs = {c.slug for c in kept_concepts}
-        results = [r for r in results if r.concept.slug in kept_slugs]
+    include_deleted = args.include_deleted
+    kept_concepts = filter_concepts(
+        [r.concept for r in results],
+        tag=args.tag,
+        min_confidence=args.min_confidence,
+        since=args.since,
+        include_deleted=include_deleted,
+    )
+    kept_slugs = {c.slug for c in kept_concepts}
+    results = [r for r in results if r.concept.slug in kept_slugs]
 
     print(pipeline.query_engine.format_results(results))
     return 0
@@ -582,6 +630,7 @@ def cmd_list(args: argparse.Namespace) -> int:
         tag=args.tag,
         min_confidence=args.min_confidence,
         since=args.since,
+        include_deleted=args.include_deleted,
     )
     if args.limit:
         results = results[: args.limit]
@@ -815,6 +864,9 @@ def cmd_show(args: argparse.Namespace) -> int:
     if not concept:
         print(f"Unknown concept: {args.slug}", file=sys.stderr)
         return 1
+    if not args.include_deleted and concept.status == "deleted":
+        print(f"Unknown concept: {args.slug}", file=sys.stderr)
+        return 1
 
     print(
         _render_show(
@@ -935,6 +987,25 @@ def cmd_config(args: argparse.Namespace) -> int:
     return 1
 
 
+def cmd_prune(args: argparse.Namespace) -> int:
+    """Hard-delete soft-marked concepts."""
+    from mindforge.prune import prune_orphans
+
+    config = MindForgeConfig(output_dir=args.output)
+    summary = prune_orphans(config, dry_run=args.dry_run, older_than_days=args.older_than_days)
+
+    if args.dry_run:
+        print(f"Would remove {summary.would_remove} soft-deleted concept(s):")
+        for slug in summary.slugs:
+            print(f"  - {slug}")
+        print("Re-run without --dry-run to apply.")
+    else:
+        print(f"Removed {summary.removed} soft-deleted concept(s).")
+        for slug in summary.slugs:
+            print(f"  - {slug}")
+    return 0
+
+
 def main() -> int:
     parser = _build_parser()
     args = parser.parse_args()
@@ -955,6 +1026,7 @@ def main() -> int:
         "list": cmd_list,
         "open": cmd_open,
         "config": cmd_config,
+        "prune": cmd_prune,
     }
 
     handler = commands.get(args.command)

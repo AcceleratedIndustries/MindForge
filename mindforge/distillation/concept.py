@@ -73,10 +73,11 @@ class Concept:
     links: list[str] = field(default_factory=list)  # wiki-link targets (slugs)
     relationships: list[Relationship] = field(default_factory=list)
     sources: list[SourceRef] = field(default_factory=list)
-    status: str = "active"  # active | conflicted | stale | orphaned
+    status: str = "active"  # active | conflicted | stale | orphaned | deleted
     conflicts: list[ConflictMarker] = field(default_factory=list)
     last_reinforced_at: str | None = None
     last_reviewed_at: str | None = None
+    deleted_at: str | None = None
 
     @property
     def slug(self) -> str:
@@ -104,6 +105,7 @@ class Concept:
             "conflicts": [c.to_dict() for c in self.conflicts],
             "last_reinforced_at": self.last_reinforced_at,
             "last_reviewed_at": self.last_reviewed_at,
+            "deleted_at": self.deleted_at,
         }
 
     @classmethod
@@ -127,6 +129,7 @@ class Concept:
             conflicts=conflicts,
             last_reinforced_at=data.get("last_reinforced_at"),
             last_reviewed_at=data.get("last_reviewed_at"),
+            deleted_at=data.get("deleted_at"),
         )
 
     def merge_with(self, other: Concept) -> Concept:
@@ -156,6 +159,16 @@ class Concept:
             self.definition if len(self.definition) >= len(other.definition) else other.definition
         )
 
+        merged_status = (
+            "deleted" if self.status == "deleted" and other.status == "deleted" else "active"
+        )
+        if merged_status == "deleted" and (self.deleted_at or other.deleted_at):
+            deleted_at: str | None = min(
+                ts for ts in (self.deleted_at, other.deleted_at) if ts is not None
+            )
+        else:
+            deleted_at = None
+
         return Concept(
             name=self.name,
             definition=definition,
@@ -168,6 +181,8 @@ class Concept:
             links=list(dict.fromkeys(self.links + other.links)),
             relationships=self.relationships + other.relationships,
             sources=merged_refs,
+            status=merged_status,
+            deleted_at=deleted_at,
         )
 
 

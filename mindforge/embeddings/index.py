@@ -109,15 +109,16 @@ class EmbeddingIndex:
         return np.array(encoded, dtype=np.float32)
 
     def build(self, concepts: list[Concept]) -> None:
-        """Build the index from a list of concepts."""
+        """Build the index from a list of concepts. Deleted concepts are excluded."""
         if not self._available:
             return
 
         import faiss
         import numpy as np
 
-        texts = [self._concept_text(c) for c in concepts]
-        self._slugs = [c.slug for c in concepts]
+        active = [c for c in concepts if c.status != "deleted"]
+        texts = [self._concept_text(c) for c in active]
+        self._slugs = [c.slug for c in active]
 
         embeddings = self._encode_batch(texts)
 

@@ -31,9 +31,12 @@ def filter_concepts(
     tag: str | None = None,
     min_confidence: float | None = None,
     since: str | None = None,
+    include_deleted: bool = False,
 ) -> list[Concept]:
     """Filter concepts by tag, minimum confidence, and/or last-reinforced-since date."""
     out = list(concepts)
+    if not include_deleted:
+        out = [c for c in out if c.status != "deleted"]
     if tag:
         out = [c for c in out if tag in c.tags]
     if min_confidence is not None:
@@ -124,7 +127,7 @@ class QueryEngine:
         self._store = store
         self._graph = graph
         self._index = embedding_index
-        self._keyword_scorer = KeywordScorer(store.all())
+        self._keyword_scorer = KeywordScorer([c for c in store.all() if c.status != "deleted"])
         self._graph_walker = GraphWalker(graph) if graph is not None else None
 
     def search(
@@ -171,7 +174,7 @@ class QueryEngine:
                 label for label, raw in (("keyword", k), ("semantic", s), ("graph", g)) if raw > 0.0
             ]
             concept = self._store.get(slug)
-            if concept is None:
+            if concept is None or concept.status == "deleted":
                 continue
             neighbors = self._graph.neighbors(slug) if self._graph is not None else []
             results.append(

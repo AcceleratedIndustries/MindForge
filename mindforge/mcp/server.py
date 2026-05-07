@@ -861,7 +861,7 @@ async def handle_tool(
         slug = _resolve_slug(kb.store, name_arg) if kb.store else name_arg
         concept = kb.store.get(slug) if kb.store else None
 
-        if not concept:
+        if not concept or concept.status == "deleted":
             return [TextContent(type="text", text=f"Concept not found: {name_arg}")]
 
         data = {
@@ -889,6 +889,7 @@ async def handle_tool(
 
         tag_filter = arguments.get("tag", "")
         concepts = kb.store.all() if kb.store else []
+        concepts = [c for c in concepts if c.status != "deleted"]
 
         if tag_filter:
             tag_lower = tag_filter.lower()
