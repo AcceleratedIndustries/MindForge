@@ -223,6 +223,11 @@ def _build_parser() -> argparse.ArgumentParser:
             "Override default weights as comma-separated keyword,semantic,graph (e.g. 0.4,0.4,0.2)"
         ),
     )
+    query.add_argument(
+        "--include-deleted",
+        action="store_true",
+        help="Include soft-deleted concepts in results",
+    )
     qemb_group = query.add_argument_group("Embedding provider")
     qemb_group.add_argument(
         "--embedding-provider",
@@ -260,6 +265,11 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     lst.add_argument("--min-confidence", type=float, default=None)
     lst.add_argument("--limit", type=int, default=None)
+    lst.add_argument(
+        "--include-deleted",
+        action="store_true",
+        help="Include soft-deleted concepts in results",
+    )
     lst.add_argument(
         "--output",
         "-o",
@@ -415,6 +425,11 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Print the concept markdown file as-is",
     )
     show.add_argument(
+        "--include-deleted",
+        action="store_true",
+        help="Include soft-deleted concepts in results",
+    )
+    show.add_argument(
         "--output",
         "-o",
         type=Path,
@@ -551,12 +566,14 @@ def cmd_query(args: argparse.Namespace) -> int:
     )
 
     # Apply filters post-search so semantic scoring isn't distorted.
-    if args.tag or args.min_confidence is not None or args.since:
+    include_deleted = getattr(args, "include_deleted", False)
+    if args.tag or args.min_confidence is not None or args.since or not include_deleted:
         kept_concepts = filter_concepts(
             [r.concept for r in results],
             tag=args.tag,
             min_confidence=args.min_confidence,
             since=args.since,
+            include_deleted=include_deleted,
         )
         kept_slugs = {c.slug for c in kept_concepts}
         results = [r for r in results if r.concept.slug in kept_slugs]
@@ -582,6 +599,7 @@ def cmd_list(args: argparse.Namespace) -> int:
         tag=args.tag,
         min_confidence=args.min_confidence,
         since=args.since,
+        include_deleted=getattr(args, "include_deleted", False),
     )
     if args.limit:
         results = results[: args.limit]
@@ -813,6 +831,9 @@ def cmd_show(args: argparse.Namespace) -> int:
     store = ConceptStore.load(manifest)
     concept = store.get(args.slug)
     if not concept:
+        print(f"Unknown concept: {args.slug}", file=sys.stderr)
+        return 1
+    if not getattr(args, "include_deleted", False) and concept.status == "deleted":
         print(f"Unknown concept: {args.slug}", file=sys.stderr)
         return 1
 

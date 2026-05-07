@@ -52,6 +52,8 @@ class KnowledgeGraph:
     def add_relationships(self, concept: Concept) -> None:
         """Add all relationships from a concept as edges."""
         for rel in concept.relationships:
+            if rel.target not in self._nodes:
+                continue
             edge_data = {
                 "source": rel.source,
                 "target": rel.target,
@@ -70,11 +72,12 @@ class KnowledgeGraph:
 
     @classmethod
     def from_store(cls, store: ConceptStore) -> KnowledgeGraph:
-        """Build a graph from a ConceptStore."""
+        """Build a graph from a ConceptStore. Deleted concepts are excluded."""
         graph = cls()
-        for concept in store.all():
+        active = [c for c in store.all() if c.status != "deleted"]
+        for concept in active:
             graph.add_concept(concept)
-        for concept in store.all():
+        for concept in active:
             graph.add_relationships(concept)
         return graph
 

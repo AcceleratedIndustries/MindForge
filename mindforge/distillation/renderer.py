@@ -108,5 +108,12 @@ def write_concept(concept: Concept, output_dir: Path) -> Path:
 
 
 def write_all_concepts(concepts: list[Concept], output_dir: Path) -> list[Path]:
-    """Write all concepts to Markdown files."""
-    return [write_concept(c, output_dir) for c in concepts]
+    """Write all active concepts; remove stale markdown for deleted slugs."""
+    output_dir.mkdir(parents=True, exist_ok=True)
+    active = [c for c in concepts if c.status != "deleted"]
+    deleted_slugs = {c.slug for c in concepts if c.status == "deleted"}
+    for slug in deleted_slugs:
+        stale = output_dir / f"{slug}.md"
+        if stale.exists():
+            stale.unlink()
+    return [write_concept(c, output_dir) for c in active]
