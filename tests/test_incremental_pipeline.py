@@ -105,8 +105,14 @@ def test_modifying_transcript_soft_marks_removed_concepts(
         transcripts_dir,
         {
             "a.md": (
-                "# Alpha\n\nAlpha is the first letter of the Greek alphabet.\n\n"
-                "# Beta\n\nBeta is the second letter of the Greek alphabet.\n"
+                "# Alpha\n\n"
+                "Alpha is the first letter of the Greek alphabet. "
+                "Alpha is widely used as a placeholder name. "
+                "Alpha denotes the start of a series.\n\n"
+                "# Beta\n\n"
+                "Beta is the second letter of the Greek alphabet. "
+                "Beta is commonly used in software for early test releases. "
+                "Beta indicates a candidate not yet ready for production.\n"
             ),
         },
     )
@@ -117,19 +123,27 @@ def test_modifying_transcript_soft_marks_removed_concepts(
     from mindforge.distillation.concept import ConceptStore
 
     first_store = ConceptStore.load(output_dir / "concepts.json")
-    assert "alpha" in first_store.concepts or "beta" in first_store.concepts
+    assert "beta" in first_store.concepts, (
+        "test is misconfigured: Beta block must produce a 'beta' concept on first run"
+    )
 
     (transcripts_dir / "a.md").write_text(
-        "# Alpha\n\nAlpha is the first letter of the Greek alphabet.\n",
+        "# Alpha\n\n"
+        "Alpha is the first letter of the Greek alphabet. "
+        "Alpha is widely used as a placeholder name. "
+        "Alpha denotes the start of a series.\n",
         encoding="utf-8",
     )
     result = MindForgePipeline(config).run()
     assert result.files_modified == 1
+    assert result.concepts_soft_deleted >= 1, (
+        "removing the Beta block should soft-delete at least one concept"
+    )
 
     second_store = ConceptStore.load(output_dir / "concepts.json")
-    if "beta" in second_store.concepts:
-        assert second_store.concepts["beta"].status == "deleted"
-        assert second_store.concepts["beta"].deleted_at is not None
+    assert "beta" in second_store.concepts, "soft-deleted concept should still be in the store"
+    assert second_store.concepts["beta"].status == "deleted"
+    assert second_store.concepts["beta"].deleted_at is not None
 
 
 def test_deleting_transcript_soft_marks_orphans(
@@ -140,7 +154,12 @@ def test_deleting_transcript_soft_marks_orphans(
         transcripts_dir,
         {
             "a.md": "# Alpha\n\nAlpha is the first letter of the Greek alphabet.\n",
-            "b.md": "# Beta\n\nBeta is the second letter of the Greek alphabet.\n",
+            "b.md": (
+                "# Beta\n\n"
+                "Beta is the second letter of the Greek alphabet. "
+                "Beta is commonly used in software for early test releases. "
+                "Beta indicates a candidate not yet ready for production.\n"
+            ),
         },
     )
 
@@ -150,9 +169,10 @@ def test_deleting_transcript_soft_marks_orphans(
     (transcripts_dir / "b.md").unlink()
     result = MindForgePipeline(config).run()
     assert result.files_deleted == 1
+    assert result.concepts_soft_deleted >= 1
 
     from mindforge.distillation.concept import ConceptStore
 
     store = ConceptStore.load(output_dir / "concepts.json")
-    if "beta" in store.concepts:
-        assert store.concepts["beta"].status == "deleted"
+    assert "beta" in store.concepts
+    assert store.concepts["beta"].status == "deleted"
