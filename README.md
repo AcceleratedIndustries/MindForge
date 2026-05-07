@@ -372,12 +372,12 @@ Claude Desktop does not inherit your shell's PATH — use absolute paths. See `d
 
 ```
 mindforge/
-├── cli.py                  # CLI: ingest, query, list, stats, mcp, show, eval, review, diff, open, config
+├── cli.py                  # CLI: ingest, query, list, stats, mcp, show, eval, review, diff, open, config, prune
 ├── config.py               # Pipeline-level configuration (paths, thresholds, LLM/embedding handles)
 ├── config_file.py          # Shared YAML config (~/.config/mindforge/config.yaml)
 ├── pipeline.py             # 6-stage pipeline orchestrator
 ├── paths.py                # MINDFORGE_ROOT / multi-KB filesystem layout
-├── ingestion/              # parser, chunker, extractor, incremental, sources
+├── ingestion/              # parser, chunker, extractor, file_hash_store, sources
 ├── distillation/           # concept models, deduplicator, distiller, renderer, source_ref
 ├── linking/                # relationship detection + wiki-links
 ├── llm/                    # client (Ollama + OpenAI HTTP), extractor, distiller
@@ -414,10 +414,7 @@ mindforge/
 - [x] **Indirect-prompt-injection mitigations** — content tagging + hidden-Unicode stripping
 - [x] **Shared config file** — `~/.config/mindforge/config.yaml`
 - [x] **Stdlib embedding providers** — Ollama and OpenAI-compatible
-
-### In progress (pre-v0.4.0 dogfood enabler)
-
-- [ ] **Incremental ingestion** — `mindforge/ingestion/incremental.py` already implements `ContentHasher` + `IncrementalIngest`, but the pipeline still re-processes every transcript on every run. CLI/pipeline integration lands next, ahead of v0.4.0, so MindForge is comfortable to use as a daily tool inside Claude Code / Cowork sessions.
+- [x] **Incremental ingestion** — file-hash cache at `output/.ingest/content_hashes.json` skips unchanged transcripts on re-runs; modified files trigger drop-and-re-extract with soft-delete on orphaned concepts; new `mindforge prune` subcommand hard-deletes soft-marked concepts; `--full` forces a full rebuild.
 
 ### Next (v0.4.0 — humans-facing)
 
