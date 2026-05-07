@@ -408,13 +408,16 @@ mindforge/
 ### Shipped
 
 - [x] **MCP server interface** — multi-KB tool server for AI agents
-- [x] **Incremental ingestion** — content hashing skips already-processed transcripts
 - [x] **Confidence decay** — half-life-based score decay for unreinforced concepts; review queue surfaces stale entries
 - [x] **Hybrid retrieval** — keyword + semantic + graph-walk fusion; eval-tuned weights
 - [x] **MCP synthesis tools** — `summarize_query`, `explain_concept`, `compare_concepts`, `path_between`, `get_subgraph`
 - [x] **Indirect-prompt-injection mitigations** — content tagging + hidden-Unicode stripping
 - [x] **Shared config file** — `~/.config/mindforge/config.yaml`
 - [x] **Stdlib embedding providers** — Ollama and OpenAI-compatible
+
+### In progress (pre-v0.4.0 dogfood enabler)
+
+- [ ] **Incremental ingestion** — `mindforge/ingestion/incremental.py` already implements `ContentHasher` + `IncrementalIngest`, but the pipeline still re-processes every transcript on every run. CLI/pipeline integration lands next, ahead of v0.4.0, so MindForge is comfortable to use as a daily tool inside Claude Code / Cowork sessions.
 
 ### Next (v0.4.0 — humans-facing)
 
