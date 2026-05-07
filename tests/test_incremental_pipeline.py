@@ -199,3 +199,25 @@ def test_full_flag_forces_full_rebuild(fixture_paths: tuple[Path, Path]) -> None
     assert result.files_new == 1
     assert result.files_unchanged == 0
     assert (output_dir / ".ingest" / "content_hashes.json").exists()
+
+
+def test_full_with_dry_run_does_not_delete_cache(
+    fixture_paths: tuple[Path, Path],
+) -> None:
+    transcripts_dir, output_dir = fixture_paths
+    _seed_transcripts(
+        transcripts_dir,
+        {"a.md": "# Alpha\n\nAlpha is the first letter of the Greek alphabet.\n"},
+    )
+    config = MindForgeConfig(transcripts_dir=transcripts_dir, output_dir=output_dir, use_llm=False)
+    MindForgePipeline(config).run()  # populate cache
+    cache_path = output_dir / ".ingest" / "content_hashes.json"
+    assert cache_path.exists()
+    cache_content_before = cache_path.read_text()
+
+    pipeline = MindForgePipeline(config)
+    pipeline._force_full = True
+    pipeline.run(dry_run=True)
+
+    assert cache_path.exists(), "dry-run must not delete the cache"
+    assert cache_path.read_text() == cache_content_before, "dry-run must not modify the cache"

@@ -100,3 +100,32 @@ def test_prune_idempotent(tmp_path: Path) -> None:
     prune_orphans(config, dry_run=False)
     summary = prune_orphans(config, dry_run=False)
     assert summary.removed == 0
+
+
+def test_prune_rebuilds_embeddings_index_when_present(tmp_path: Path) -> None:
+    """After pruning, the embeddings index should not contain pruned slugs."""
+    output_dir = tmp_path / "output"
+    now = datetime.now(timezone.utc).isoformat()
+    _seed_kb(
+        output_dir,
+        [_make("A"), _make("B", status="deleted", deleted_at=now)],
+    )
+    # Simulate an existing embeddings dir (any file in it triggers the rebuild path).
+    embeddings_dir = output_dir / "embeddings"
+    embeddings_dir.mkdir(parents=True, exist_ok=True)
+    (embeddings_dir / "metadata.json").write_text("{}")
+
+    config = MindForgeConfig(output_dir=output_dir)
+    summary = prune_orphans(config, dry_run=False)
+    assert summary.removed == 1
+
+    # If embeddings extras are installed, the actual rebuilt index should not list 'b'.
+    # If they're not, the function should still complete cleanly without error.
+    from mindforge.embeddings.index import EmbeddingIndex
+
+    index = EmbeddingIndex(config.embedding_model)
+    if index.available:
+        # Reload from disk:
+        loaded = EmbeddingIndex.load(embeddings_dir)
+        if loaded.available:
+            assert "b" not in loaded._slugs  # noqa: SLF001

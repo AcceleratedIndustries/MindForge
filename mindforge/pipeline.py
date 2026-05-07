@@ -150,7 +150,7 @@ class MindForgePipeline:
         print(f"  Found {len(transcripts)} file(s), {total_turns} turns")
 
         ingest_dir = self.config.output_dir / ".ingest"
-        if self._force_full:
+        if self._force_full and not dry_run:
             cache_path = ingest_dir / FileHashStore.HASH_FILE_NAME
             cache_path.unlink(missing_ok=True)
         hash_store = FileHashStore.load(ingest_dir, self.config.transcripts_dir)

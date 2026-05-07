@@ -68,5 +68,14 @@ def prune_orphans(
             graph = KnowledgeGraph.from_store(store)
             graph.save(graph_path)
 
+        embeddings_dir = config.embeddings_dir
+        if embeddings_dir.exists() and any(embeddings_dir.iterdir()):
+            from mindforge.embeddings.index import EmbeddingIndex
+
+            index = EmbeddingIndex(config.embedding_model)
+            if index.available:
+                index.build(store.all())
+                index.save(embeddings_dir)
+
     summary.removed = len(to_remove)
     return summary
