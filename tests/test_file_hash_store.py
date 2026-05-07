@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from mindforge.ingestion.file_hash_store import ContentHasher, FileHashStore
 
 
@@ -122,3 +124,37 @@ class TestFileHashStore:
 
         raw = json.loads((ingest_dir / "content_hashes.json").read_text())
         assert "subdir/a.md" in raw or str(Path("subdir/a.md")) in raw
+
+    def test_load_handles_corrupted_cache_gracefully(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """A corrupted cache file should not break the pipeline."""
+        transcripts = tmp_path / "transcripts"
+        transcripts.mkdir()
+        ingest_dir = tmp_path / ".ingest"
+        ingest_dir.mkdir()
+        (ingest_dir / "content_hashes.json").write_text("{not valid json")
+
+        store = FileHashStore.load(ingest_dir, transcripts)
+        assert store.known_paths() == set()
+        assert "corrupted" in capsys.readouterr().err
+
+    def test_save_is_atomic(self, tmp_path: Path) -> None:
+        """save() should write via a temp file so a crash mid-write doesn't corrupt."""
+        transcripts = tmp_path / "transcripts"
+        transcripts.mkdir()
+        f = transcripts / "a.md"
+        f.write_text("x")
+
+        ingest_dir = tmp_path / ".ingest"
+        store = FileHashStore.load(ingest_dir, transcripts)
+        store.update(f, "abc")
+        store.save()
+
+        # The .tmp file should not be left behind after a successful save.
+        leftover = list(ingest_dir.glob("*.tmp"))
+        assert leftover == [], f"unexpected leftover temp files: {leftover}"
+
+        # The final file should contain valid JSON.
+        raw = (ingest_dir / "content_hashes.json").read_text()
+        json.loads(raw)  # raises if not valid JSON

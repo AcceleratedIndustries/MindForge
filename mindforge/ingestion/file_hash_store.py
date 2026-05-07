@@ -9,8 +9,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import sys
 from dataclasses import dataclass
-from enum import Enum
 from pathlib import Path
 
 
@@ -29,12 +30,6 @@ class ContentHasher:
 
     def hash_string(self, content: str) -> str:
         return hashlib.sha256(content.encode("utf-8")).hexdigest()
-
-
-class _Status(str, Enum):
-    NEW = "new"
-    MODIFIED = "modified"
-    UNCHANGED = "unchanged"
 
 
 @dataclass
@@ -70,13 +65,23 @@ class FileHashStore:
     @classmethod
     def load(cls, ingest_dir: Path, transcripts_dir: Path) -> FileHashStore:
         path = Path(ingest_dir) / cls.HASH_FILE_NAME
-        data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+        data: dict[str, str] = {}
+        if path.exists():
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError as exc:
+                print(
+                    f"warning: {path} is corrupted ({exc}); treating as empty cache",
+                    file=sys.stderr,
+                )
         return cls(ingest_dir=ingest_dir, transcripts_dir=transcripts_dir, hashes=data)
 
     def save(self) -> None:
         self.ingest_dir.mkdir(parents=True, exist_ok=True)
         path = self.ingest_dir / self.HASH_FILE_NAME
-        path.write_text(json.dumps(self._hashes, indent=2, sort_keys=True), encoding="utf-8")
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        tmp.write_text(json.dumps(self._hashes, indent=2, sort_keys=True), encoding="utf-8")
+        os.replace(tmp, path)
 
     def _key(self, file_path: Path) -> str:
         resolved = Path(file_path).resolve()
