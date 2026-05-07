@@ -408,7 +408,11 @@ class MindForgePipeline:
             api_key=self.config.llm_api_key,
             timeout=self.config.llm_timeout,
             ollama_keep_alive=self.config.llm_keep_alive,
-            ollama_think=self.config.llm_think,
+            # Extraction always disables reasoning — the task is filling a fixed
+            # JSON schema, and chain-of-thought is ~5x cost for marginal gain.
+            # Synthesis tools (summarize_query, explain_concept, ...) keep
+            # thinking available via `llm.synthesis_think`.
+            ollama_think=False,
         )
         client = LLMClient(llm_config)
 

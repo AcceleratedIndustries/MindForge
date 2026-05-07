@@ -38,7 +38,6 @@ class MindForgeConfig:
     llm_api_key: str = ""  # Required for OpenAI provider
     llm_keep_alive: int | str = -1
     llm_timeout: int = 120
-    llm_think: bool | None = None  # Ollama 0.6.x+: disable reasoning model thinking
 
     # Embeddings (optional)
     embedding_model: str = "all-MiniLM-L6-v2"

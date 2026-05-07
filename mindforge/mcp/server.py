@@ -1142,6 +1142,8 @@ def _build_llm_client(cfg: ConfigFile) -> LLMClient:
             model=cfg.llm.model,
             api_key=cfg.llm.api_key,
             timeout=cfg.llm.timeout,
+            ollama_keep_alive=cfg.llm.keep_alive,
+            ollama_think=cfg.llm.synthesis_think,
         )
     )
 
