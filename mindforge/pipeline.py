@@ -127,6 +127,7 @@ class MindForgePipeline:
         self.graph: KnowledgeGraph | None = None
         self.embedding_index: EmbeddingIndex | None = None
         self.query_engine: QueryEngine | None = None
+        self._force_full: bool = False
 
     def run(self, dry_run: bool = False) -> PipelineResult:
         """Execute the full pipeline: ingest → extract → distill → link → graph → index.
@@ -149,6 +150,9 @@ class MindForgePipeline:
         print(f"  Found {len(transcripts)} file(s), {total_turns} turns")
 
         ingest_dir = self.config.output_dir / ".ingest"
+        if self._force_full:
+            cache_path = ingest_dir / FileHashStore.HASH_FILE_NAME
+            cache_path.unlink(missing_ok=True)
         hash_store = FileHashStore.load(ingest_dir, self.config.transcripts_dir)
 
         on_disk_paths = {Path(t.source_file).resolve() for t in transcripts}
@@ -195,7 +199,7 @@ class MindForgePipeline:
             f"{len(unchanged_files)}/{len(deleted_paths)}"
         )
 
-        is_incremental = cache_existed and not getattr(self, "_force_full", False)
+        is_incremental = cache_existed and not self._force_full
 
         files_to_process: list[Path]
         soft_deleted_count = 0

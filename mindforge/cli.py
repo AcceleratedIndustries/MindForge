@@ -108,6 +108,11 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Preview diff against the existing KB without writing anything",
     )
+    ingest.add_argument(
+        "--full",
+        action="store_true",
+        help="Force a full rebuild, ignoring the incremental hash cache",
+    )
 
     # LLM extraction options
     llm_group = ingest.add_argument_group("LLM extraction")
@@ -499,6 +504,8 @@ def cmd_ingest(args: argparse.Namespace) -> int:
     print()
 
     pipeline = MindForgePipeline(config)
+    if args.full:
+        pipeline._force_full = True
     result = pipeline.run(dry_run=args.dry_run)
 
     print()

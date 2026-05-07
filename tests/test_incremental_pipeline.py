@@ -176,3 +176,26 @@ def test_deleting_transcript_soft_marks_orphans(
     store = ConceptStore.load(output_dir / "concepts.json")
     assert "beta" in store.concepts
     assert store.concepts["beta"].status == "deleted"
+
+
+def test_full_flag_forces_full_rebuild(fixture_paths: tuple[Path, Path]) -> None:
+    transcripts_dir, output_dir = fixture_paths
+    _seed_transcripts(
+        transcripts_dir,
+        {
+            "a.md": "# Alpha\n\nAlpha is the first letter of the Greek alphabet.\n",
+        },
+    )
+
+    config = MindForgeConfig(transcripts_dir=transcripts_dir, output_dir=output_dir, use_llm=False)
+    MindForgePipeline(config).run()  # first run — populates cache
+
+    # Force full rebuild via the API the CLI uses.
+    pipeline = MindForgePipeline(config)
+    pipeline._force_full = True
+    result = pipeline.run()
+
+    assert result.skipped is False
+    assert result.files_new == 1
+    assert result.files_unchanged == 0
+    assert (output_dir / ".ingest" / "content_hashes.json").exists()
