@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 class LLMConfig:
     """Configuration for the LLM client."""
 
-    provider: str = "ollama"  # "ollama" or "openai"
+    provider: str = "ollama"  # "ollama" | "openai" | "mock"
     model: str = "llama3.2"
     base_url: str = ""  # Auto-set based on provider if empty
     api_key: str = ""  # Required for OpenAI provider
@@ -216,3 +216,21 @@ class LLMClient:
             prompt_tokens=usage.get("prompt_tokens", 0),
             completion_tokens=usage.get("completion_tokens", 0),
         )
+
+
+def make_llm_client(config: LLMConfig) -> LLMClient:
+    """Construct the right LLM client for ``config.provider``.
+
+    Returns ``MockLLMClient`` when provider is "mock"; otherwise returns the
+    standard ``LLMClient`` (which dispatches Ollama vs. OpenAI internally).
+    Raises ``ValueError`` for unknown providers.
+    """
+    if config.provider == "mock":
+        from mindforge.llm.mock import MockLLMClient
+
+        return MockLLMClient(config)
+    if config.provider in ("ollama", "openai"):
+        return LLMClient(config)
+    raise ValueError(
+        f"unknown LLM provider: {config.provider!r}; expected one of ollama|openai|mock"
+    )
