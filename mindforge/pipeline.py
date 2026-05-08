@@ -62,6 +62,36 @@ def read_manifest_history(manifest_path: Path) -> list[dict[str, Any]]:
     return history
 
 
+def check_kb_provider_compat(manifest_path: Path, *, current_provider: str) -> None:
+    """Refuse to mix mock and real LLM runs in the same output directory.
+
+    Reads the most recent manifest history entry's ``provider`` field and
+    compares it to ``current_provider``. Mock and real runs cannot share a
+    KB; mixing would corrupt either the test data or the production data.
+
+    Legacy manifests without a ``provider`` field are treated as real
+    (mock didn't exist before this guard, so any unmarked KB is real by
+    construction).
+
+    Raises ``RuntimeError`` with a user-actionable message on mismatch.
+    """
+    history = read_manifest_history(manifest_path)
+    if not history:
+        return
+    last = history[-1]
+    last_provider = last.get("provider", "ollama")  # legacy = real
+    last_is_mock = last_provider == "mock"
+    current_is_mock = current_provider == "mock"
+    if last_is_mock != current_is_mock:
+        raise RuntimeError(
+            f"Output dir {manifest_path.parent} was last built with provider "
+            f"'{last_provider}'; current provider is '{current_provider}'. "
+            f"Mock and real runs cannot share a KB. Either point output_dir "
+            f"at a fresh location, or wipe the dir to rebuild under the new "
+            f"provider."
+        )
+
+
 def _write_all_provenance(concepts: list[Concept], provenance_dir: Path) -> int:
     """Write one provenance JSON per concept that has sources. Returns file count."""
     count = 0
