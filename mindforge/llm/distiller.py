@@ -18,8 +18,8 @@ from mindforge.distillation.distiller import (
 from mindforge.distillation.distiller import (
     distill_concept as heuristic_distill,
 )
+from mindforge.distillation.raw import RawConcept
 from mindforge.ingestion.chunker import Chunk
-from mindforge.ingestion.extractor import RawConcept
 from mindforge.utils.text import extract_keywords, normalize_whitespace
 
 # Map LLM relationship type strings to our enum

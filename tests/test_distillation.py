@@ -3,8 +3,8 @@
 from mindforge.distillation.concept import Concept, ConceptStore, Relationship, RelationshipType
 from mindforge.distillation.deduplicator import deduplicate_concepts
 from mindforge.distillation.distiller import distill_concept
+from mindforge.distillation.raw import RawConcept
 from mindforge.distillation.renderer import render_concept, write_concept
-from mindforge.ingestion.extractor import RawConcept
 
 
 class TestConcept:

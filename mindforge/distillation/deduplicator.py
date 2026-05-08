@@ -6,7 +6,7 @@ preserving the best content from each.
 
 from __future__ import annotations
 
-from mindforge.ingestion.extractor import RawConcept
+from mindforge.distillation.raw import RawConcept
 from mindforge.utils.text import compute_text_similarity, slugify
 
 

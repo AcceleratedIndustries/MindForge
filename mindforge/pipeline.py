@@ -15,11 +15,12 @@ from typing import Any
 from mindforge.config import MindForgeConfig
 from mindforge.distillation.concept import Concept, ConceptStore
 from mindforge.distillation.deduplicator import deduplicate_concepts
+from mindforge.distillation.raw import RawConcept
 from mindforge.distillation.renderer import write_all_concepts
 from mindforge.embeddings.index import EmbeddingIndex
 from mindforge.graph.builder import KnowledgeGraph
 from mindforge.ingestion.chunker import Chunk, chunk_turns
-from mindforge.ingestion.extractor import RawConcept, extract_concepts
+from mindforge.ingestion.extractor import extract_concepts
 from mindforge.ingestion.file_hash_store import FileHashStore
 from mindforge.ingestion.parser import parse_all_transcripts
 from mindforge.linking.linker import detect_links

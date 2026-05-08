@@ -15,8 +15,8 @@ import logging
 import re
 from dataclasses import dataclass
 
+from mindforge.distillation.raw import RawConcept
 from mindforge.ingestion.chunker import Chunk
-from mindforge.ingestion.extractor import RawConcept
 from mindforge.llm.client import LLMClient
 
 logger = logging.getLogger(__name__)

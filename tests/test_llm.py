@@ -12,8 +12,8 @@ LLM server. They verify:
 import json
 from unittest.mock import MagicMock
 
+from mindforge.distillation.raw import RawConcept
 from mindforge.ingestion.chunker import Chunk
-from mindforge.ingestion.extractor import RawConcept
 from mindforge.llm.client import LLMClient, LLMConfig, LLMResponse
 from mindforge.llm.distiller import (
     _clean_markers,

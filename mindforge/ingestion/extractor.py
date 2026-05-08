@@ -10,24 +10,10 @@ Uses heuristic and statistical methods (no LLM required):
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
 
+from mindforge.distillation.raw import RawConcept
 from mindforge.ingestion.chunker import Chunk
 from mindforge.utils.text import extract_keywords, normalize_whitespace
-
-
-@dataclass
-class RawConcept:
-    """A candidate concept before distillation."""
-
-    name: str
-    raw_content: str
-    source_chunks: list[str] = field(default_factory=list)  # chunk IDs
-    source_files: list[str] = field(default_factory=list)
-    extraction_method: str = "unknown"
-    confidence: float = 0.5
-    source_hash: str = ""  # Content hash for tracking modifications
-
 
 # Patterns that indicate a definition or explanation
 _DEFINITION_PATTERNS = [
