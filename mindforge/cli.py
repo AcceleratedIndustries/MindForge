@@ -379,8 +379,8 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     ev.add_argument(
         "--mode",
-        choices=["heuristic", "llm", "tune-retrieval"],
-        default="heuristic",
+        choices=["mock", "llm", "tune-retrieval"],
+        default="mock",
         help="Extraction mode, or tune-retrieval to sweep hybrid weights",
     )
     ev.add_argument(

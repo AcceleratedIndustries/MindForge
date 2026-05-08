@@ -16,11 +16,12 @@ from mindforge.graph.builder import KnowledgeGraph
 from mindforge.pipeline import MindForgePipeline
 
 
-def run_eval(fixtures_dir: Path, mode: str = "heuristic", **llm_kwargs: Any) -> dict[str, Any]:
+def run_eval(fixtures_dir: Path, mode: str = "mock", **llm_kwargs: Any) -> dict[str, Any]:
     """Run the pipeline on a fixture directory and score against ground truth.
 
-    ``mode`` is "heuristic" (default) or "llm". For LLM mode, pass
-    ``llm_provider``, ``llm_model``, ``llm_base_url``, ``llm_api_key`` via kwargs.
+    ``mode`` is "mock" (default; deterministic smoke test) or "llm" (real
+    LLM, used as the quality gate). For LLM mode, pass ``llm_provider``,
+    ``llm_model``, ``llm_base_url``, ``llm_api_key`` via kwargs.
     """
     fixtures = load_corpus(fixtures_dir)
     if not fixtures:
@@ -31,11 +32,7 @@ def run_eval(fixtures_dir: Path, mode: str = "heuristic", **llm_kwargs: Any) -> 
         cfg_kwargs: dict[str, Any] = {
             "transcripts_dir": fixtures_dir,
             "output_dir": out,
-            # mode == "heuristic" maps to mock for the duration of the
-            # transition window between this task and Task 11 (which removes
-            # "heuristic" as a valid CLI choice). After Task 11, only
-            # "mock" and "llm" reach this code path.
-            "llm_provider": "mock" if mode in ("heuristic", "mock") else "ollama",
+            "llm_provider": "mock" if mode == "mock" else "ollama",
         }
         for k, v in llm_kwargs.items():
             if k.startswith("llm_"):

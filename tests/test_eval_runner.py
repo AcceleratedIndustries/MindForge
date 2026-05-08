@@ -12,7 +12,7 @@ def _write(path: Path, text: str) -> None:
 
 
 def test_runner_empty_corpus_returns_zero_report(tmp_path: Path):
-    report = run_eval(tmp_path, mode="heuristic")
+    report = run_eval(tmp_path, mode="mock")
     assert report["corpus_size"] == 0
     md = render_markdown(report)
     assert "no fixtures" in md.lower()
