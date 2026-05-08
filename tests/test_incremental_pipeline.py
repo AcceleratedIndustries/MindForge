@@ -32,7 +32,12 @@ def test_first_run_creates_hash_cache(fixture_paths: tuple[Path, Path]) -> None:
         },
     )
 
-    config = MindForgeConfig(transcripts_dir=transcripts_dir, output_dir=output_dir, use_llm=False)
+    config = MindForgeConfig(
+        transcripts_dir=transcripts_dir,
+        output_dir=output_dir,
+        use_llm=True,
+        llm_provider="mock",
+    )
     pipeline = MindForgePipeline(config)
     result = pipeline.run()
 
@@ -52,7 +57,12 @@ def test_rerun_with_no_changes_triggers_fast_path(
         },
     )
 
-    config = MindForgeConfig(transcripts_dir=transcripts_dir, output_dir=output_dir, use_llm=False)
+    config = MindForgeConfig(
+        transcripts_dir=transcripts_dir,
+        output_dir=output_dir,
+        use_llm=True,
+        llm_provider="mock",
+    )
     MindForgePipeline(config).run()  # first full run
 
     result = MindForgePipeline(config).run()  # second run, no changes
@@ -73,7 +83,12 @@ def test_adding_new_transcript_preserves_old_concepts(
         },
     )
 
-    config = MindForgeConfig(transcripts_dir=transcripts_dir, output_dir=output_dir, use_llm=False)
+    config = MindForgeConfig(
+        transcripts_dir=transcripts_dir,
+        output_dir=output_dir,
+        use_llm=True,
+        llm_provider="mock",
+    )
     MindForgePipeline(config).run()
 
     from mindforge.distillation.concept import ConceptStore
@@ -117,7 +132,12 @@ def test_modifying_transcript_soft_marks_removed_concepts(
         },
     )
 
-    config = MindForgeConfig(transcripts_dir=transcripts_dir, output_dir=output_dir, use_llm=False)
+    config = MindForgeConfig(
+        transcripts_dir=transcripts_dir,
+        output_dir=output_dir,
+        use_llm=True,
+        llm_provider="mock",
+    )
     MindForgePipeline(config).run()
 
     from mindforge.distillation.concept import ConceptStore
@@ -163,7 +183,12 @@ def test_deleting_transcript_soft_marks_orphans(
         },
     )
 
-    config = MindForgeConfig(transcripts_dir=transcripts_dir, output_dir=output_dir, use_llm=False)
+    config = MindForgeConfig(
+        transcripts_dir=transcripts_dir,
+        output_dir=output_dir,
+        use_llm=True,
+        llm_provider="mock",
+    )
     MindForgePipeline(config).run()
 
     (transcripts_dir / "b.md").unlink()
@@ -187,7 +212,12 @@ def test_full_flag_forces_full_rebuild(fixture_paths: tuple[Path, Path]) -> None
         },
     )
 
-    config = MindForgeConfig(transcripts_dir=transcripts_dir, output_dir=output_dir, use_llm=False)
+    config = MindForgeConfig(
+        transcripts_dir=transcripts_dir,
+        output_dir=output_dir,
+        use_llm=True,
+        llm_provider="mock",
+    )
     MindForgePipeline(config).run()  # first run — populates cache
 
     # Force full rebuild via the API the CLI uses.
@@ -209,7 +239,12 @@ def test_full_with_dry_run_does_not_delete_cache(
         transcripts_dir,
         {"a.md": "# Alpha\n\nAlpha is the first letter of the Greek alphabet.\n"},
     )
-    config = MindForgeConfig(transcripts_dir=transcripts_dir, output_dir=output_dir, use_llm=False)
+    config = MindForgeConfig(
+        transcripts_dir=transcripts_dir,
+        output_dir=output_dir,
+        use_llm=True,
+        llm_provider="mock",
+    )
     MindForgePipeline(config).run()  # populate cache
     cache_path = output_dir / ".ingest" / "content_hashes.json"
     assert cache_path.exists()
