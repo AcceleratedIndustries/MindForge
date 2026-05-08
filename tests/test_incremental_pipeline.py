@@ -35,7 +35,6 @@ def test_first_run_creates_hash_cache(fixture_paths: tuple[Path, Path]) -> None:
     config = MindForgeConfig(
         transcripts_dir=transcripts_dir,
         output_dir=output_dir,
-        use_llm=True,
         llm_provider="mock",
     )
     pipeline = MindForgePipeline(config)
@@ -60,7 +59,6 @@ def test_rerun_with_no_changes_triggers_fast_path(
     config = MindForgeConfig(
         transcripts_dir=transcripts_dir,
         output_dir=output_dir,
-        use_llm=True,
         llm_provider="mock",
     )
     MindForgePipeline(config).run()  # first full run
@@ -86,7 +84,6 @@ def test_adding_new_transcript_preserves_old_concepts(
     config = MindForgeConfig(
         transcripts_dir=transcripts_dir,
         output_dir=output_dir,
-        use_llm=True,
         llm_provider="mock",
     )
     MindForgePipeline(config).run()
@@ -135,7 +132,6 @@ def test_modifying_transcript_soft_marks_removed_concepts(
     config = MindForgeConfig(
         transcripts_dir=transcripts_dir,
         output_dir=output_dir,
-        use_llm=True,
         llm_provider="mock",
     )
     MindForgePipeline(config).run()
@@ -186,7 +182,6 @@ def test_deleting_transcript_soft_marks_orphans(
     config = MindForgeConfig(
         transcripts_dir=transcripts_dir,
         output_dir=output_dir,
-        use_llm=True,
         llm_provider="mock",
     )
     MindForgePipeline(config).run()
@@ -215,7 +210,6 @@ def test_full_flag_forces_full_rebuild(fixture_paths: tuple[Path, Path]) -> None
     config = MindForgeConfig(
         transcripts_dir=transcripts_dir,
         output_dir=output_dir,
-        use_llm=True,
         llm_provider="mock",
     )
     MindForgePipeline(config).run()  # first run — populates cache
@@ -242,7 +236,6 @@ def test_full_with_dry_run_does_not_delete_cache(
     config = MindForgeConfig(
         transcripts_dir=transcripts_dir,
         output_dir=output_dir,
-        use_llm=True,
         llm_provider="mock",
     )
     MindForgePipeline(config).run()  # populate cache

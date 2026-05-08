@@ -31,7 +31,11 @@ def run_eval(fixtures_dir: Path, mode: str = "heuristic", **llm_kwargs: Any) -> 
         cfg_kwargs: dict[str, Any] = {
             "transcripts_dir": fixtures_dir,
             "output_dir": out,
-            "use_llm": mode == "llm",
+            # mode == "heuristic" maps to mock for the duration of the
+            # transition window between this task and Task 11 (which removes
+            # "heuristic" as a valid CLI choice). After Task 11, only
+            # "mock" and "llm" reach this code path.
+            "llm_provider": "mock" if mode in ("heuristic", "mock") else "ollama",
         }
         for k, v in llm_kwargs.items():
             if k.startswith("llm_"):

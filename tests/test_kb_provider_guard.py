@@ -103,7 +103,6 @@ class TestPipelineWiring:
             transcripts_dir=transcripts,
             output_dir=out,
             llm_provider="mock",
-            use_llm=True,
         )
         pipe = MindForgePipeline(cfg)
         with pytest.raises(RuntimeError, match="last built with provider 'ollama'"):

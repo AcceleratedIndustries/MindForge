@@ -18,7 +18,6 @@ def test_dry_run_writes_no_files(tmp_path: Path) -> None:
     cfg = MindForgeConfig(
         transcripts_dir=transcripts,
         output_dir=out,
-        use_llm=True,
         llm_provider="mock",
     )
     result = MindForgePipeline(cfg).run(dry_run=True)
@@ -38,7 +37,6 @@ def test_dry_run_reports_diff(tmp_path: Path) -> None:
     cfg = MindForgeConfig(
         transcripts_dir=transcripts,
         output_dir=out,
-        use_llm=True,
         llm_provider="mock",
     )
 
