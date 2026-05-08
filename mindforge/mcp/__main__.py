@@ -18,7 +18,7 @@ from mindforge.mcp.server import configure_runtime, main
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="python -m mindforge.mcp")
-    parser.add_argument("--llm-provider", choices=["ollama", "openai"], default=None)
+    parser.add_argument("--llm-provider", choices=["ollama", "openai", "mock"], default=None)
     parser.add_argument("--llm-base-url", default="")
     parser.add_argument("--llm-model", default=None)
     parser.add_argument("--llm-summarize-model", default="")
