@@ -123,9 +123,10 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     llm_group.add_argument(
         "--llm-provider",
-        choices=["ollama", "openai"],
+        choices=["ollama", "openai", "mock"],
         default=None,
-        help="LLM provider (overrides config; default: from config or ollama)",
+        help="LLM provider (overrides config; default: from config or ollama). "
+        "'mock' uses the deterministic content-derivative test client.",
     )
     llm_group.add_argument(
         "--llm-model",
@@ -328,7 +329,7 @@ def _build_parser() -> argparse.ArgumentParser:
     mcp_llm = mcp.add_argument_group("LLM (synthesis tools)")
     mcp_llm.add_argument(
         "--llm-provider",
-        choices=["ollama", "openai"],
+        choices=["ollama", "openai", "mock"],
         default=None,
         help="LLM provider (overrides config)",
     )
