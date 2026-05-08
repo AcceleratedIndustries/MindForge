@@ -172,6 +172,40 @@ class TestBatchChunks:
         batches = _batch_chunks(chunks, max_chars=1000)
         assert len(batches) == 1  # Can't split a single chunk
 
+    def test_never_mixes_source_files(self):
+        # A batch must contain chunks from only one source file. Without this,
+        # every concept extracted from a multi-file batch gets all of the
+        # batch's source_files attached as provenance, breaking deletion-driven
+        # soft-delete (a concept whose only source was the deleted file would
+        # incorrectly still reference its batch-mates' files).
+        chunks = [
+            Chunk(
+                content="x" * 100,
+                source_file="a.md",
+                turn_index=0,
+                chunk_index=0,
+                chunk_type="prose",
+            ),
+            Chunk(
+                content="x" * 100,
+                source_file="b.md",
+                turn_index=0,
+                chunk_index=0,
+                chunk_type="prose",
+            ),
+            Chunk(
+                content="x" * 100,
+                source_file="b.md",
+                turn_index=0,
+                chunk_index=1,
+                chunk_type="prose",
+            ),
+        ]
+        batches = _batch_chunks(chunks, max_chars=10_000)
+        assert len(batches) == 2
+        assert {c.source_file for c in batches[0]} == {"a.md"}
+        assert {c.source_file for c in batches[1]} == {"b.md"}
+
 
 # === Tests for LLM-aware distillation ===
 

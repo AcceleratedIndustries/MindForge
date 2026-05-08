@@ -128,3 +128,19 @@ class TestMockGenerate:
                 c.extraction_method == "llm"
             )  # parser stamps this; mock indistinguishable to consumer
             assert c.confidence == 0.9
+
+    def test_strips_prompt_envelope_before_extracting(self) -> None:
+        # The mock must operate on the chunk-text body of the LLM extraction
+        # prompt, not the whole prompt template. Without the envelope strip,
+        # boilerplate words ('Extract', 'TEXT', 'For', 'Respond') would shadow
+        # real chunk concepts and consume the 3-concept-per-call cap.
+        from mindforge.llm.extractor import EXTRACTION_USER_PROMPT
+
+        prompt = EXTRACTION_USER_PROMPT.format(text="KV Cache exists.")
+        resp = self.client.generate(prompt, response_format="json")
+        data = json.loads(resp.content)
+        names = [c["name"] for c in data["concepts"]]
+        assert "KV Cache" in names
+        # Boilerplate words from the prompt template must not appear as concepts.
+        for boilerplate in ("Extract", "TEXT", "For", "Respond"):
+            assert boilerplate not in names
