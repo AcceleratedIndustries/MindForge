@@ -14,12 +14,21 @@ from mindforge.llm.client import LLMClient, LLMConfig, LLMResponse
 
 _TITLECASE_PHRASE = re.compile(
     r"\b([A-Z][a-zA-Z0-9]*(?:-[A-Z][a-zA-Z0-9]*)*"
-    r"(?:\s+[A-Z][a-zA-Z0-9]*(?:-[A-Z][a-zA-Z0-9]*)*){0,3})\b"
+    r"(?:[ \t]+[A-Z][a-zA-Z0-9]*(?:-[A-Z][a-zA-Z0-9]*)*){0,3})\b"
 )
 _SENTENCE_BOUNDARY = re.compile(r"[.!?]\s+")
 _MAX_CONCEPTS_PER_CALL = 3
 _MIN_NAME_LEN = 3
 _MAX_DEFINITION_CHARS = 300
+
+# Real extraction prompts wrap the chunk in a TEXT: ... \n\nRespond with ...
+# envelope. Slice that out so the mock acts on chunk content only — otherwise
+# title-case words in the prompt boilerplate ("Extract", "TEXT") would shadow
+# the actual concepts.
+_PROMPT_TEXT_BLOCK = re.compile(
+    r"TEXT:\s*\n(?P<body>.*?)\n\s*Respond with",
+    re.DOTALL,
+)
 
 
 def _surrounding_sentence(text: str, position: int) -> str:
@@ -73,6 +82,8 @@ class MockLLMClient(LLMClient):
         self._available = True
 
     def generate(self, prompt: str, system: str = "", response_format: str = "") -> LLMResponse:
-        concepts = _mock_concepts_from_text(prompt)
+        m = _PROMPT_TEXT_BLOCK.search(prompt)
+        text = m.group("body") if m else prompt
+        concepts = _mock_concepts_from_text(text)
         body = json.dumps({"concepts": concepts})
         return LLMResponse(content=body, success=True)

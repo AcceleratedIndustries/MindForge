@@ -37,7 +37,7 @@ def test_runner_produces_report(tmp_path: Path):
         "expected_relationships: []\n",
     )
 
-    report = run_eval(fixtures, mode="heuristic")
+    report = run_eval(fixtures, mode="llm", llm_provider="mock")
     assert report["corpus_size"] == 1
     assert "concepts" in report
     c = report["concepts"]
@@ -54,7 +54,7 @@ def test_runner_report_markdown_format(tmp_path: Path):
         "expected_concepts:\n  - name: Foo\n    slug: foo\n    key_phrases: []\n"
         "expected_relationships: []\n",
     )
-    report = run_eval(fixtures, mode="heuristic")
+    report = run_eval(fixtures, mode="llm", llm_provider="mock")
     md = render_markdown(report)
     assert "MindForge Evaluation Report" in md
     assert "Recall" in md

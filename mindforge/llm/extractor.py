@@ -169,20 +169,29 @@ def _batch_chunks(chunks: list[Chunk], max_chars: int = 6000) -> list[list[Chunk
     """Group chunks into batches that fit within the LLM context window.
 
     Keeps chunks together up to max_chars total, so each LLM call
-    processes a coherent block of text.
+    processes a coherent block of text. Never mixes chunks from
+    different source files: every concept extracted from a batch is
+    attributed to the batch's source files, so cross-file batches
+    poison per-file provenance and break incremental soft-delete on
+    file removal.
     """
     batches: list[list[Chunk]] = []
     current_batch: list[Chunk] = []
     current_size = 0
+    current_source: str | None = None
 
     for chunk in chunks:
         chunk_size = len(chunk.content)
-        if current_batch and current_size + chunk_size > max_chars:
+        crosses_file = current_batch and chunk.source_file != current_source
+        too_big = current_batch and current_size + chunk_size > max_chars
+        if crosses_file or too_big:
             batches.append(current_batch)
             current_batch = []
             current_size = 0
+            current_source = None
         current_batch.append(chunk)
         current_size += chunk_size
+        current_source = chunk.source_file
 
     if current_batch:
         batches.append(current_batch)

@@ -58,7 +58,12 @@ def test_pipeline_populates_concept_sources_and_writes_provenance(tmp_path: Path
     )
 
     out = tmp_path / "out"
-    cfg = MindForgeConfig(transcripts_dir=transcripts, output_dir=out)
+    cfg = MindForgeConfig(
+        transcripts_dir=transcripts,
+        output_dir=out,
+        use_llm=True,
+        llm_provider="mock",
+    )
     pipeline = MindForgePipeline(cfg)
     pipeline.run()
 

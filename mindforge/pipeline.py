@@ -20,7 +20,6 @@ from mindforge.distillation.renderer import write_all_concepts
 from mindforge.embeddings.index import EmbeddingIndex
 from mindforge.graph.builder import KnowledgeGraph
 from mindforge.ingestion.chunker import Chunk, chunk_turns
-from mindforge.ingestion.extractor import extract_concepts
 from mindforge.ingestion.file_hash_store import FileHashStore
 from mindforge.ingestion.parser import parse_all_transcripts
 from mindforge.linking.linker import detect_links
@@ -283,13 +282,7 @@ class MindForgePipeline:
             all_chunks.extend(chunks)
         print(f"  Generated {len(all_chunks)} semantic chunks")
 
-        extraction_method = "heuristic"
-        raw_concepts: list[RawConcept] = []
-
-        if self.config.use_llm:
-            raw_concepts, extraction_method = self._extract_with_llm(all_chunks)
-        else:
-            raw_concepts = extract_concepts(all_chunks)
+        raw_concepts, extraction_method = self._extract_with_llm(all_chunks)
 
         print(f"  Extracted {len(raw_concepts)} candidate concepts")
 
@@ -444,9 +437,10 @@ class MindForgePipeline:
         self,
         chunks: list[Chunk],
     ) -> tuple[list[RawConcept], str]:
-        """Attempt LLM extraction, falling back to heuristic if unavailable.
+        """Run LLM extraction.
 
-        Returns (concepts, extraction_method_name).
+        Returns (concepts, extraction_method_name). Raises RuntimeError if the
+        LLM endpoint is unreachable.
         """
         llm_config = LLMConfig(
             provider=self.config.llm_provider,
@@ -464,9 +458,12 @@ class MindForgePipeline:
         client = make_llm_client(llm_config)
 
         if not client.available:
-            print(f"  LLM server not reachable ({llm_config.base_url})")
-            print("  Falling back to heuristic extraction")
-            return extract_concepts(chunks), "heuristic (LLM unavailable)"
+            raise RuntimeError(
+                f"LLM endpoint not reachable at {llm_config.base_url}. "
+                f"Configure ~/.config/mindforge/config.yaml or pass "
+                f"--llm-base-url. For pipeline-test mode without a real LLM, "
+                f"set llm.provider: mock."
+            )
 
         print(f"  Using LLM: {llm_config.provider}/{llm_config.model}")
         llm_concepts, stats = extract_concepts_llm(chunks, client)
@@ -474,24 +471,9 @@ class MindForgePipeline:
         if stats.parse_failures > 0:
             print(f"  Warning: {stats.parse_failures} LLM parse failure(s)")
 
-        # Also run heuristic extraction and merge (LLM may miss things
-        # that pattern matching catches, and vice versa)
-        heuristic_concepts = extract_concepts(chunks)
-        print(
-            f"  LLM extracted {len(llm_concepts)} concepts, "
-            f"heuristic found {len(heuristic_concepts)}"
-        )
-
-        # Merge: LLM concepts take priority, then add unique heuristic ones
-        seen_names = {c.name.lower() for c in llm_concepts}
-        merged = list(llm_concepts)
-        for hc in heuristic_concepts:
-            if hc.name.lower() not in seen_names:
-                seen_names.add(hc.name.lower())
-                merged.append(hc)
-
-        method = f"llm ({llm_config.provider}/{llm_config.model}) + heuristic"
-        return merged, method
+        print(f"  LLM extracted {len(llm_concepts)} concepts")
+        method = f"llm ({llm_config.provider}/{llm_config.model})"
+        return llm_concepts, method
 
     def _load_state(self) -> None:
         """Load previously built state from disk."""

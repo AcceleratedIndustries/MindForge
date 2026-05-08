@@ -33,6 +33,8 @@ class TestPipeline:
         config = MindForgeConfig(
             transcripts_dir=transcripts_dir,
             output_dir=output_dir,
+            use_llm=True,
+            llm_provider="mock",
         )
         pipeline = MindForgePipeline(config)
         result = pipeline.run()
@@ -73,6 +75,8 @@ class TestPipeline:
         config = MindForgeConfig(
             transcripts_dir=transcripts_dir,
             output_dir=output_dir,
+            use_llm=True,
+            llm_provider="mock",
         )
         pipeline = MindForgePipeline(config)
         pipeline.run()
@@ -88,6 +92,8 @@ class TestPipeline:
         config = MindForgeConfig(
             transcripts_dir=transcripts_dir,
             output_dir=output_dir,
+            use_llm=True,
+            llm_provider="mock",
         )
         pipeline = MindForgePipeline(config)
         result = pipeline.run()
