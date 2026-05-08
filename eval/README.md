@@ -26,11 +26,16 @@ expected_relationships:
 ## Running
 
 ```
-mindforge eval --fixtures eval/fixtures --mode heuristic
+mindforge eval --fixtures eval/fixtures --mode mock
 ```
 
 Report lands on stdout (markdown) and `eval/reports/<timestamp>.json` (machine-readable).
 
+### Eval modes
+
+- `mindforge eval --mode mock` (default) — deterministic smoke test. Verifies the pipeline runs end-to-end and the scorer produces a structurally valid report. Recall/precision/phrase-grounding numbers are not asserted in this mode; the mock client's content is not the gate.
+- `mindforge eval --mode llm` — real-LLM quality gate. Runs against a configured LLM endpoint; recall/precision are meaningful. Run separately from per-PR CI.
+
 ## CI
 
-`.github/workflows/eval.yml` runs heuristic-mode eval on any PR that touches `mindforge/ingestion/`, `mindforge/distillation/`, `mindforge/llm/`, `mindforge/linking/`, or `eval/fixtures/`.
+`.github/workflows/eval.yml` runs mock-mode eval on any PR that touches `mindforge/ingestion/`, `mindforge/distillation/`, `mindforge/llm/`, `mindforge/linking/`, or `eval/fixtures/`. The real-LLM quality gate runs separately.

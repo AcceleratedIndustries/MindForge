@@ -81,7 +81,7 @@ Provenance is threaded through the pipeline at the point of extraction:
 
 1. **Parser** (`ingestion/parser.py`) already knows transcript path + turn indices. No change needed; it already produces `Turn` objects.
 2. **Chunker** (`ingestion/chunker.py`) must **preserve** which turns a chunk came from. Add `source_turns: list[int]` to `Chunk`.
-3. **Extractor** (heuristic and LLM both) must **attach** the source chunk(s) to each `RawConcept`. Add `source_chunks: list[Chunk]` to `RawConcept`.
+3. **Extractor** (`llm/extractor.py`) must **attach** the source chunk(s) to each `RawConcept`. Add `source_chunks: list[Chunk]` to `RawConcept`.
 4. **Deduplicator** (`distillation/deduplicator.py`) **merges** source lists when it merges concepts.
 5. **Distiller** produces final `Concept` with `sources` populated from the chunks.
 6. **Store** persists sources to the manifest and to YAML frontmatter.

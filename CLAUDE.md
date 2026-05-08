@@ -10,7 +10,7 @@ See `docs/ARCHITECTURE.md` for the Python core / HTTP API / UI layering plus dep
 
 ## Running the eval suite
 
-    mindforge eval --mode heuristic
+    mindforge eval --mode mock
 
 Reports land in `eval/reports/<timestamp>.json`.
 
@@ -41,7 +41,7 @@ All three run in CI (`.github/workflows/ci.yml`) plus bandit + pip-audit + gitle
 
 - `pytest`
 - `ruff check . && ruff format --check . && mypy mindforge`
-- `mindforge eval --mode heuristic` (only if touching extraction / distillation / llm / linking).
+- `mindforge eval --mode mock` (only if touching extraction / distillation / llm / linking).
 
 ## PyPI, Homebrew, binaries
 

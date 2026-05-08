@@ -17,7 +17,7 @@ MindForge captures that knowledge and turns it into something you can **navigate
 - **Knowledge graph included** -- Visualize how concepts connect
 - **Hybrid retrieval by default** -- Keyword + semantic + graph-walk fusion, with eval-tuned weights
 - **Synthesis tools for agents** -- `summarize_query` returns ~200-400 token prose, not 2000-token concept dumps
-- **LLM-powered extraction** -- Optionally use Ollama or any OpenAI-compatible API for dramatically better results
+- **LLM-powered extraction** -- Local Ollama by default; any OpenAI-compatible API also supported
 - **100% local** -- No cloud required. Your knowledge stays yours.
 
 ---
@@ -88,20 +88,20 @@ mindforge query "..." --weights 0.5,0.3,0.2   # keyword,semantic,graph
 mindforge query "..." --mode keyword          # legacy keyword-only
 ```
 
-**With LLM extraction** (recommended for best results — extracts richer concepts and explicit relationships):
+**Choosing an LLM provider** (LLM extraction is always on; the provider is configurable):
 
 ```bash
-# Local Ollama (default model: qwen3:30b-a3b)
-mindforge ingest --input transcripts/ --llm
+# Local Ollama (default; default model: qwen3:30b-a3b)
+mindforge ingest --input transcripts/
 
-# Pin a specific model
-mindforge ingest --input transcripts/ --llm --llm-model llama3.2
+# Pin a specific Ollama model
+mindforge ingest --input transcripts/ --llm-model llama3.2
 
 # OpenAI
-mindforge ingest --input transcripts/ --llm --llm-provider openai --llm-api-key sk-...
+mindforge ingest --input transcripts/ --llm-provider openai --llm-api-key sk-...
 
 # Any OpenAI-compatible endpoint (vLLM, LM Studio, Together, etc.)
-mindforge ingest --input transcripts/ --llm --llm-provider openai \
+mindforge ingest --input transcripts/ --llm-provider openai \
     --llm-base-url http://localhost:8000 --llm-model my-model
 ```
 
@@ -200,15 +200,15 @@ Vector index for semantic search. Ships with three providers — see [Embedding 
 ```
 Transcripts --> Parse --> Chunk --> Extract --> Distill --> Link --> Graph (--> Embeddings)
                                      |                       |
-                                     +-- Heuristic           +-- Wiki-links
-                                     +-- LLM (optional)      +-- Typed relationships
+                                     +-- LLM (Ollama,        +-- Wiki-links
+                                         OpenAI, or mock)    +-- Typed relationships
 ```
 
 | Stage | What it does |
 |-------|-------------|
 | **Parse** | Multi-format transcript parser (role-prefixed, heading-style, separators) |
 | **Chunk** | Semantic chunking that respects paragraphs, headings, and code blocks |
-| **Extract** | Identify concepts via definition patterns, heading analysis, keyword frequency -- or LLM |
+| **Extract** | Identify concepts and relationships via the configured LLM provider (Ollama, OpenAI-compat, or the deterministic mock for tests) |
 | **Distill** | Deduplicate, clean conversational fluff, extract insights, build structured definitions |
 | **Link** | Detect relationships via co-occurrence, keyword overlap, and structural patterns |
 | **Graph** | Build a NetworkX knowledge graph, export as JSON |
@@ -273,17 +273,15 @@ Supported conversation formats:
 
 ---
 
-## Heuristic vs LLM Extraction
+## Extraction modes
 
-| | Heuristic (default) | LLM-assisted (`--llm`) |
-|---|---|---|
-| **Speed** | Instant | Depends on model |
-| **Dependencies** | None | Ollama or API |
-| **Quality** | Good for well-structured transcripts | Excellent for any text |
-| **Relationships** | Detected via patterns | Explicitly identified by the LLM |
-| **Fallback** | N/A | Automatic fallback to heuristic if LLM unreachable |
+`mindforge ingest` always runs LLM extraction. The provider is selected via `llm.provider` in `~/.config/mindforge/config.yaml` (or `--llm-provider`):
 
-When `--llm` is enabled, MindForge runs **both** extractors and merges the results. LLM-identified concepts take priority, and any unique heuristic findings are added in.
+- `ollama` (default): local LLM via Ollama; requires a reachable endpoint.
+- `openai`: OpenAI-compatible HTTP API; requires `llm.api_key`.
+- `mock`: deterministic content-derivative test client; no network. Use this for fast pipeline tests in CI and local development.
+
+> **Mock and real runs cannot share an output directory.** The pipeline refuses to mix them at startup. Use a separate `output_dir` for mock-mode test runs (convention: `<your-kb>/mock-test/` or a tempdir).
 
 ---
 

@@ -68,12 +68,18 @@ MindForge is a **Python core** with a **JavaScript UI layer**, connected by a **
 
 ---
 
+## Extraction
+
+A single LLM-driven extractor (`mindforge.llm.extractor`) consumes chunks and emits `RawConcept` candidates. The provider is pluggable via `make_llm_client(config)` in `mindforge.llm.client` — `ollama`, `openai`, or `mock` (deterministic content-derivative test client). The mock provider is used for CI and pipeline tests; the real providers handle production ingest. Mock and real runs cannot share an output directory; the pipeline refuses to mix them at startup so the KB stays trustworthy.
+
+---
+
 ## Layering rules
 
 1. **Surfaces never touch storage directly.** CLI, UI, MCP server all go through the pipeline orchestrator or the HTTP API.
 2. **Stages don't call each other.** The pipeline orchestrates them. Stages consume `ConceptStore` and return new concepts/edges.
 3. **Storage is the source of truth.** Every derived artifact (graph, embeddings index) can be rebuilt from `concepts/*.md` + `concepts.json`. No hidden state.
-4. **Optional services fail soft.** LLM unreachable → heuristic fallback. Embeddings not installed → keyword-only search. Nothing hard-requires a non-core dependency.
+4. **Optional services fail soft where they can.** Embeddings not installed → keyword-only search. The LLM extractor is the only extraction lane (see § Extraction below); if the configured endpoint is unreachable, ingest fails fast rather than silently degrading the KB.
 
 ---
 
