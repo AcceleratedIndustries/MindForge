@@ -16,8 +16,8 @@ class RawConcept:
 
     name: str
     raw_content: str
-    source_chunks: list[str] = field(default_factory=list)
+    source_chunks: list[str] = field(default_factory=list)  # chunk IDs
     source_files: list[str] = field(default_factory=list)
     extraction_method: str = "unknown"
     confidence: float = 0.5
-    source_hash: str = ""
+    source_hash: str = ""  # Content hash for tracking modifications (incremental ingest)
