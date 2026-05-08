@@ -123,7 +123,7 @@ class PipelineResult:
     concept_files_written: int
     edges_in_graph: int
     embeddings_built: bool
-    extraction_method: str = "heuristic"
+    extraction_method: str = "unknown"
     dry_run: bool = False
     new: int = 0
     updated: int = 0
