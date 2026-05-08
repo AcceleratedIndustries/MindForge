@@ -13,7 +13,7 @@ def test_write_snapshot_creates_history_file(tmp_path: Path) -> None:
     store = ConceptStore()
     store.add(Concept(name="A", definition="d", explanation="e"))
     manifest_path = tmp_path / "manifest.json"
-    write_manifest_snapshot(store, manifest_path)
+    write_manifest_snapshot(store, manifest_path, provider="ollama")
 
     assert manifest_path.exists()
     data = json.loads(manifest_path.read_text())
@@ -28,10 +28,10 @@ def test_multiple_snapshots_accumulate(tmp_path: Path) -> None:
     store = ConceptStore()
     store.add(Concept(name="A", definition="d", explanation="e"))
     manifest_path = tmp_path / "manifest.json"
-    write_manifest_snapshot(store, manifest_path)
+    write_manifest_snapshot(store, manifest_path, provider="ollama")
 
     store.add(Concept(name="B", definition="d", explanation="e"))
-    write_manifest_snapshot(store, manifest_path)
+    write_manifest_snapshot(store, manifest_path, provider="ollama")
 
     history = read_manifest_history(manifest_path)
     assert len(history) == 2

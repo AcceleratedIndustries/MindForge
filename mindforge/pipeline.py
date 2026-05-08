@@ -30,12 +30,18 @@ from mindforge.llm.extractor import extract_concepts_llm
 from mindforge.query.engine import QueryEngine
 
 
-def write_manifest_snapshot(store: ConceptStore, manifest_path: Path) -> None:
-    """Append a timestamped snapshot of slug hashes to manifest_path."""
+def write_manifest_snapshot(store: ConceptStore, manifest_path: Path, *, provider: str) -> None:
+    """Append a timestamped snapshot of slug hashes to manifest_path.
+
+    ``provider`` records which LLM provider produced this snapshot
+    ("ollama" | "openai" | "mock") so future runs can refuse to mix
+    real and mock data in the same KB.
+    """
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     slug_hashes = {c.slug: c.hash for c in store.all()}
     snapshot = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
+        "provider": provider,
         "slug_hashes": slug_hashes,
     }
     data: dict[str, Any]
@@ -314,7 +320,11 @@ class MindForgePipeline:
         self.store.save(manifest_path)
 
         # Write timestamped manifest-history snapshot for `mindforge diff`.
-        write_manifest_snapshot(self.store, self.config.output_dir / "manifest.json")
+        write_manifest_snapshot(
+            self.store,
+            self.config.output_dir / "manifest.json",
+            provider=self.config.llm_provider,
+        )
 
         # Write per-concept provenance JSON files.
         _write_all_provenance(self.store.all(), self.config.provenance_dir)
