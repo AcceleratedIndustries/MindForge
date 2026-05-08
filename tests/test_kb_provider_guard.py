@@ -76,3 +76,35 @@ class TestProviderGuard:
         check_kb_provider_compat(manifest, current_provider="ollama")
         with pytest.raises(RuntimeError):
             check_kb_provider_compat(manifest, current_provider="mock")
+
+
+class TestPipelineWiring:
+    def test_pipeline_run_refuses_mock_on_real_kb(self, tmp_path: Path) -> None:
+        """Pipeline.run() must hit the guard before doing extraction work."""
+        from mindforge.config import MindForgeConfig
+        from mindforge.pipeline import MindForgePipeline
+
+        # Create a tiny "real" KB by hand: manifest with provider="ollama".
+        out = tmp_path / "out"
+        out.mkdir()
+        _write_manifest(
+            out / "manifest.json",
+            [
+                {"timestamp": "...", "provider": "ollama", "slug_hashes": {}},
+            ],
+        )
+
+        # Now try to run with provider=mock pointed at the same dir.
+        transcripts = tmp_path / "transcripts"
+        transcripts.mkdir()
+        (transcripts / "x.md").write_text("Human: test\n\nAssistant: ok", encoding="utf-8")
+
+        cfg = MindForgeConfig(
+            transcripts_dir=transcripts,
+            output_dir=out,
+            llm_provider="mock",
+            use_llm=True,
+        )
+        pipe = MindForgePipeline(cfg)
+        with pytest.raises(RuntimeError, match="last built with provider 'ollama'"):
+            pipe.run()

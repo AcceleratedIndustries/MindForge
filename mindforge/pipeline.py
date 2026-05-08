@@ -24,7 +24,7 @@ from mindforge.ingestion.extractor import extract_concepts
 from mindforge.ingestion.file_hash_store import FileHashStore
 from mindforge.ingestion.parser import parse_all_transcripts
 from mindforge.linking.linker import detect_links
-from mindforge.llm.client import LLMClient, LLMConfig
+from mindforge.llm.client import LLMConfig, make_llm_client
 from mindforge.llm.distiller import distill_all_smart
 from mindforge.llm.extractor import extract_concepts_llm
 from mindforge.query.engine import QueryEngine
@@ -175,6 +175,12 @@ class MindForgePipeline:
         updating the manifest.
         """
         self.config.ensure_dirs()
+
+        # Refuse to mix mock and real runs in the same KB.
+        check_kb_provider_compat(
+            self.config.output_dir / "manifest.json",
+            current_provider=self.config.llm_provider,
+        )
 
         # === Stage 1: Ingestion ===
         print("[1/6] Parsing transcripts...")
@@ -455,7 +461,7 @@ class MindForgePipeline:
             # thinking available via `llm.synthesis_think`.
             ollama_think=False,
         )
-        client = LLMClient(llm_config)
+        client = make_llm_client(llm_config)
 
         if not client.available:
             print(f"  LLM server not reachable ({llm_config.base_url})")
