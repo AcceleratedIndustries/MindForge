@@ -117,15 +117,11 @@ def _build_parser() -> argparse.ArgumentParser:
     # LLM extraction options
     llm_group = ingest.add_argument_group("LLM extraction")
     llm_group.add_argument(
-        "--llm",
-        action="store_true",
-        help="Use LLM-assisted concept extraction (requires Ollama or API)",
-    )
-    llm_group.add_argument(
         "--llm-provider",
-        choices=["ollama", "openai"],
+        choices=["ollama", "openai", "mock"],
         default=None,
-        help="LLM provider (overrides config; default: from config or ollama)",
+        help="LLM provider (overrides config; default: from config or ollama). "
+        "'mock' uses the deterministic content-derivative test client.",
     )
     llm_group.add_argument(
         "--llm-model",
@@ -328,7 +324,7 @@ def _build_parser() -> argparse.ArgumentParser:
     mcp_llm = mcp.add_argument_group("LLM (synthesis tools)")
     mcp_llm.add_argument(
         "--llm-provider",
-        choices=["ollama", "openai"],
+        choices=["ollama", "openai", "mock"],
         default=None,
         help="LLM provider (overrides config)",
     )
@@ -383,8 +379,8 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     ev.add_argument(
         "--mode",
-        choices=["heuristic", "llm", "tune-retrieval"],
-        default="heuristic",
+        choices=["mock", "llm", "tune-retrieval"],
+        default="mock",
         help="Extraction mode, or tune-retrieval to sweep hybrid weights",
     )
     ev.add_argument(
@@ -513,7 +509,6 @@ def cmd_ingest(args: argparse.Namespace) -> int:
         output_dir=args.output,
         use_embeddings=args.embeddings,
         similarity_threshold=args.similarity_threshold,
-        use_llm=args.llm,
         llm_provider=file_cfg.llm.provider,
         llm_model=file_cfg.llm.model,
         llm_base_url=file_cfg.llm.base_url,
@@ -526,8 +521,7 @@ def cmd_ingest(args: argparse.Namespace) -> int:
     print(f"MindForge v{__version__}")
     print(f"Input:  {config.transcripts_dir.resolve()}")
     print(f"Output: {config.output_dir.resolve()}")
-    if config.use_llm:
-        print(f"LLM:    {config.llm_provider}/{config.llm_model}")
+    print(f"LLM:    {config.llm_provider}/{config.llm_model}")
     print()
 
     pipeline = MindForgePipeline(config)

@@ -2,13 +2,13 @@
 
 **Phase:** 1.2
 **Depends on:** —
-**Unblocks:** trustworthy changes to extraction and distillation prompts/heuristics
+**Unblocks:** trustworthy changes to extraction and distillation prompts
 
 ---
 
 ## Motivation
 
-Every change to the heuristic patterns, LLM prompts, or distillation logic silently changes output quality. Today there's no way to answer: "does this change make extraction better or worse?"
+Every change to the LLM prompts or distillation logic silently changes output quality. Today there's no way to answer: "does this change make extraction better or worse?"
 
 Without that answer, every tweak is vibes-based, and regressions ship unnoticed.
 
@@ -23,7 +23,7 @@ mindforge eval
 # → MindForge Evaluation Report
 # → ========================================
 # →   Corpus:    eval/fixtures/ (12 transcripts, 2,341 turns)
-# →   Mode:      heuristic
+# →   Mode:      mock
 # →
 # →   Concepts
 # →     Expected:          87
@@ -42,12 +42,9 @@ mindforge eval
 
 # Run with a specific mode
 mindforge eval --mode llm --llm-provider ollama --llm-model llama3.2
-
-# Compare two modes
-mindforge eval --compare heuristic llm
 ```
 
-A CI workflow runs `mindforge eval --mode heuristic` on every PR and fails if recall drops by more than a configurable threshold.
+A CI workflow runs `mindforge eval --mode mock` on every PR as a structural smoke test (the mock client's content is not the gate); the real-LLM quality gate runs separately.
 
 ---
 
@@ -96,7 +93,7 @@ expected_relationships:
 
 ### CI integration
 
-`.github/workflows/eval.yml` runs on PRs that touch `mindforge/ingestion/`, `mindforge/distillation/`, `mindforge/llm/`, or `mindforge/linking/`. Heuristic-only (LLM eval requires secrets; skip in CI, run locally or on cron).
+`.github/workflows/eval.yml` runs on PRs that touch `mindforge/ingestion/`, `mindforge/distillation/`, `mindforge/llm/`, or `mindforge/linking/`. Mock-mode only — a structural smoke test that exercises the pipeline without an LLM endpoint. The real-LLM quality gate (`--mode llm`) requires a reachable endpoint; run locally or on cron.
 
 ---
 
@@ -127,6 +124,6 @@ expected_relationships:
 
 ## Open questions
 
-- **LLM non-determinism:** LLM extraction outputs vary run-to-run. Options: (a) seed where possible, (b) run N=3 and report mean±stdev, (c) only gate on heuristic mode in CI. **Proposed:** (c), with (b) on local eval runs.
+- **LLM non-determinism:** LLM extraction outputs vary run-to-run. Options: (a) seed where possible, (b) run N=3 and report mean±stdev, (c) only gate on mock mode in CI (structural smoke test) and run real-LLM quality runs separately. **Proposed:** (c), with (b) on local eval runs.
 - **Ground truth maintenance:** who updates GT YAMLs when the team consciously improves extraction? Adopt a convention: GT changes must land in the same PR as the extractor change, with reviewer sign-off.
 - **Corpus licensing:** synthetic transcripts are safe. If we include real chat logs, sanitize and get explicit permission. **Proposed:** 100% synthetic to start.

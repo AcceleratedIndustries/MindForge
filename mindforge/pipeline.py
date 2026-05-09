@@ -15,26 +15,32 @@ from typing import Any
 from mindforge.config import MindForgeConfig
 from mindforge.distillation.concept import Concept, ConceptStore
 from mindforge.distillation.deduplicator import deduplicate_concepts
+from mindforge.distillation.raw import RawConcept
 from mindforge.distillation.renderer import write_all_concepts
 from mindforge.embeddings.index import EmbeddingIndex
 from mindforge.graph.builder import KnowledgeGraph
 from mindforge.ingestion.chunker import Chunk, chunk_turns
-from mindforge.ingestion.extractor import RawConcept, extract_concepts
 from mindforge.ingestion.file_hash_store import FileHashStore
 from mindforge.ingestion.parser import parse_all_transcripts
 from mindforge.linking.linker import detect_links
-from mindforge.llm.client import LLMClient, LLMConfig
+from mindforge.llm.client import LLMConfig, make_llm_client
 from mindforge.llm.distiller import distill_all_smart
 from mindforge.llm.extractor import extract_concepts_llm
 from mindforge.query.engine import QueryEngine
 
 
-def write_manifest_snapshot(store: ConceptStore, manifest_path: Path) -> None:
-    """Append a timestamped snapshot of slug hashes to manifest_path."""
+def write_manifest_snapshot(store: ConceptStore, manifest_path: Path, *, provider: str) -> None:
+    """Append a timestamped snapshot of slug hashes to manifest_path.
+
+    ``provider`` records which LLM provider produced this snapshot
+    ("ollama" | "openai" | "mock") so future runs can refuse to mix
+    real and mock data in the same KB.
+    """
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     slug_hashes = {c.slug: c.hash for c in store.all()}
     snapshot = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
+        "provider": provider,
         "slug_hashes": slug_hashes,
     }
     data: dict[str, Any]
@@ -53,6 +59,36 @@ def read_manifest_history(manifest_path: Path) -> list[dict[str, Any]]:
     data = json.loads(manifest_path.read_text(encoding="utf-8"))
     history: list[dict[str, Any]] = data.get("history", [])
     return history
+
+
+def check_kb_provider_compat(manifest_path: Path, *, current_provider: str) -> None:
+    """Refuse to mix mock and real LLM runs in the same output directory.
+
+    Reads the most recent manifest history entry's ``provider`` field and
+    compares it to ``current_provider``. Mock and real runs cannot share a
+    KB; mixing would corrupt either the test data or the production data.
+
+    Legacy manifests without a ``provider`` field are treated as real
+    (mock didn't exist before this guard, so any unmarked KB is real by
+    construction).
+
+    Raises ``RuntimeError`` with a user-actionable message on mismatch.
+    """
+    history = read_manifest_history(manifest_path)
+    if not history:
+        return
+    last = history[-1]
+    last_provider = last.get("provider", "ollama")  # legacy = real
+    last_is_mock = last_provider == "mock"
+    current_is_mock = current_provider == "mock"
+    if last_is_mock != current_is_mock:
+        raise RuntimeError(
+            f"Output dir {manifest_path.parent} was last built with provider "
+            f"'{last_provider}'; current provider is '{current_provider}'. "
+            f"Mock and real runs cannot share a KB. Either point output_dir "
+            f"at a fresh location, or wipe the dir to rebuild under the new "
+            f"provider."
+        )
 
 
 def _write_all_provenance(concepts: list[Concept], provenance_dir: Path) -> int:
@@ -87,7 +123,7 @@ class PipelineResult:
     concept_files_written: int
     edges_in_graph: int
     embeddings_built: bool
-    extraction_method: str = "heuristic"
+    extraction_method: str = "unknown"
     dry_run: bool = False
     new: int = 0
     updated: int = 0
@@ -138,6 +174,12 @@ class MindForgePipeline:
         updating the manifest.
         """
         self.config.ensure_dirs()
+
+        # Refuse to mix mock and real runs in the same KB.
+        check_kb_provider_compat(
+            self.config.output_dir / "manifest.json",
+            current_provider=self.config.llm_provider,
+        )
 
         # === Stage 1: Ingestion ===
         print("[1/6] Parsing transcripts...")
@@ -240,13 +282,7 @@ class MindForgePipeline:
             all_chunks.extend(chunks)
         print(f"  Generated {len(all_chunks)} semantic chunks")
 
-        extraction_method = "heuristic"
-        raw_concepts: list[RawConcept] = []
-
-        if self.config.use_llm:
-            raw_concepts, extraction_method = self._extract_with_llm(all_chunks)
-        else:
-            raw_concepts = extract_concepts(all_chunks)
+        raw_concepts, extraction_method = self._extract_with_llm(all_chunks)
 
         print(f"  Extracted {len(raw_concepts)} candidate concepts")
 
@@ -313,7 +349,11 @@ class MindForgePipeline:
         self.store.save(manifest_path)
 
         # Write timestamped manifest-history snapshot for `mindforge diff`.
-        write_manifest_snapshot(self.store, self.config.output_dir / "manifest.json")
+        write_manifest_snapshot(
+            self.store,
+            self.config.output_dir / "manifest.json",
+            provider=self.config.llm_provider,
+        )
 
         # Write per-concept provenance JSON files.
         _write_all_provenance(self.store.all(), self.config.provenance_dir)
@@ -397,9 +437,10 @@ class MindForgePipeline:
         self,
         chunks: list[Chunk],
     ) -> tuple[list[RawConcept], str]:
-        """Attempt LLM extraction, falling back to heuristic if unavailable.
+        """Run LLM extraction.
 
-        Returns (concepts, extraction_method_name).
+        Returns (concepts, extraction_method_name). Raises RuntimeError if the
+        LLM endpoint is unreachable.
         """
         llm_config = LLMConfig(
             provider=self.config.llm_provider,
@@ -414,37 +455,30 @@ class MindForgePipeline:
             # thinking available via `llm.synthesis_think`.
             ollama_think=False,
         )
-        client = LLMClient(llm_config)
+        client = make_llm_client(llm_config)
 
         if not client.available:
-            print(f"  LLM server not reachable ({llm_config.base_url})")
-            print("  Falling back to heuristic extraction")
-            return extract_concepts(chunks), "heuristic (LLM unavailable)"
+            raise RuntimeError(
+                f"LLM endpoint not reachable at {llm_config.base_url}. "
+                f"Configure ~/.config/mindforge/config.yaml or pass "
+                f"--llm-base-url. For pipeline-test mode without a real LLM, "
+                f"set llm.provider: mock."
+            )
 
         print(f"  Using LLM: {llm_config.provider}/{llm_config.model}")
         llm_concepts, stats = extract_concepts_llm(chunks, client)
 
         if stats.parse_failures > 0:
             print(f"  Warning: {stats.parse_failures} LLM parse failure(s)")
+        if stats.rejected_by_grounding > 0:
+            print(
+                f"  Grounding filter rejected {stats.rejected_by_grounding} "
+                f"concept(s) not present in source text"
+            )
 
-        # Also run heuristic extraction and merge (LLM may miss things
-        # that pattern matching catches, and vice versa)
-        heuristic_concepts = extract_concepts(chunks)
-        print(
-            f"  LLM extracted {len(llm_concepts)} concepts, "
-            f"heuristic found {len(heuristic_concepts)}"
-        )
-
-        # Merge: LLM concepts take priority, then add unique heuristic ones
-        seen_names = {c.name.lower() for c in llm_concepts}
-        merged = list(llm_concepts)
-        for hc in heuristic_concepts:
-            if hc.name.lower() not in seen_names:
-                seen_names.add(hc.name.lower())
-                merged.append(hc)
-
-        method = f"llm ({llm_config.provider}/{llm_config.model}) + heuristic"
-        return merged, method
+        print(f"  LLM extracted {len(llm_concepts)} concepts")
+        method = f"llm ({llm_config.provider}/{llm_config.model})"
+        return llm_concepts, method
 
     def _load_state(self) -> None:
         """Load previously built state from disk."""

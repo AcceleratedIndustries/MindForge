@@ -31,7 +31,6 @@ class MindForgeConfig:
     link_confidence_threshold: float = 0.3
 
     # LLM extraction (optional)
-    use_llm: bool = False
     llm_provider: str = "ollama"  # "ollama" or "openai"
     llm_model: str = "llama3.2"
     llm_base_url: str = ""  # Auto-set based on provider if empty

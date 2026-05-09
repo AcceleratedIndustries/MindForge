@@ -15,7 +15,11 @@ def test_dry_run_writes_no_files(tmp_path: Path) -> None:
         "Assistant: KV Cache is a mechanism that stores Key and Value matrices.\n"
     )
     out = tmp_path / "out"
-    cfg = MindForgeConfig(transcripts_dir=transcripts, output_dir=out)
+    cfg = MindForgeConfig(
+        transcripts_dir=transcripts,
+        output_dir=out,
+        llm_provider="mock",
+    )
     result = MindForgePipeline(cfg).run(dry_run=True)
     assert result.dry_run is True
     # Output dir should exist (ensure_dirs ran) but carry no concept files.
@@ -30,7 +34,11 @@ def test_dry_run_reports_diff(tmp_path: Path) -> None:
         "Assistant: KV Cache is a mechanism that stores Key and Value matrices.\n"
     )
     out = tmp_path / "out"
-    cfg = MindForgeConfig(transcripts_dir=transcripts, output_dir=out)
+    cfg = MindForgeConfig(
+        transcripts_dir=transcripts,
+        output_dir=out,
+        llm_provider="mock",
+    )
 
     # First real run.
     MindForgePipeline(cfg).run()

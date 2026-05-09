@@ -76,7 +76,7 @@ See docs/ARCHITECTURE.md
 pytest
 
 ## Running the eval suite
-mindforge eval --mode heuristic
+mindforge eval --mode mock
 
 ## Dependency policy
 - Core install (`pip install mindforge`) stays lean (networkx, pyyaml, stdlib)
@@ -90,7 +90,7 @@ mindforge eval --mode heuristic
 
 ## Before opening a PR
 - pytest
-- mindforge eval --mode heuristic (if touching extraction/distillation)
+- mindforge eval --mode mock (if touching extraction/distillation)
 ```
 
 ---

@@ -11,9 +11,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from mindforge.distillation.concept import Concept
+from mindforge.distillation.raw import RawConcept
 from mindforge.distillation.source_ref import SourceRef
 from mindforge.ingestion.chunker import Chunk
-from mindforge.ingestion.extractor import RawConcept
 from mindforge.utils.text import (
     compute_text_similarity,
     content_hash,

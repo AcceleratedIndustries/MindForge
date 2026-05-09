@@ -12,8 +12,8 @@ LLM server. They verify:
 import json
 from unittest.mock import MagicMock
 
+from mindforge.distillation.raw import RawConcept
 from mindforge.ingestion.chunker import Chunk
-from mindforge.ingestion.extractor import RawConcept
 from mindforge.llm.client import LLMClient, LLMConfig, LLMResponse
 from mindforge.llm.distiller import (
     _clean_markers,
@@ -25,6 +25,7 @@ from mindforge.llm.distiller import (
 from mindforge.llm.extractor import (
     _batch_chunks,
     _extract_json_from_response,
+    _name_in_text,
     _parse_llm_concepts,
     extract_concepts_llm,
 )
@@ -171,6 +172,93 @@ class TestBatchChunks:
         chunks = [self._make_chunk("x" * 5000)]
         batches = _batch_chunks(chunks, max_chars=1000)
         assert len(batches) == 1  # Can't split a single chunk
+
+    def test_never_mixes_source_files(self):
+        # A batch must contain chunks from only one source file. Without this,
+        # every concept extracted from a multi-file batch gets all of the
+        # batch's source_files attached as provenance, breaking deletion-driven
+        # soft-delete (a concept whose only source was the deleted file would
+        # incorrectly still reference its batch-mates' files).
+        chunks = [
+            Chunk(
+                content="x" * 100,
+                source_file="a.md",
+                turn_index=0,
+                chunk_index=0,
+                chunk_type="prose",
+            ),
+            Chunk(
+                content="x" * 100,
+                source_file="b.md",
+                turn_index=0,
+                chunk_index=0,
+                chunk_type="prose",
+            ),
+            Chunk(
+                content="x" * 100,
+                source_file="b.md",
+                turn_index=0,
+                chunk_index=1,
+                chunk_type="prose",
+            ),
+        ]
+        batches = _batch_chunks(chunks, max_chars=10_000)
+        assert len(batches) == 2
+        assert {c.source_file for c in batches[0]} == {"a.md"}
+        assert {c.source_file for c in batches[1]} == {"b.md"}
+
+
+# === Tests for grounding filter ===
+
+
+class TestNameInText:
+    def test_exact_match_case_insensitive(self):
+        assert _name_in_text("KV Cache", "We discussed KV Cache today.")
+        assert _name_in_text("KV Cache", "we discussed kv cache today.")
+        assert _name_in_text("KV Cache", "WE DISCUSSED KV CACHE TODAY.")
+
+    def test_token_boundaries_reject_substring_matches(self):
+        # "RAG" must not match inside "storage", "coverage", "drag", etc.
+        assert not _name_in_text("RAG", "Long-term storage is fine.")
+        assert not _name_in_text("RAG", "Test coverage was high.")
+        assert not _name_in_text("RAG", "drag-and-drop works.")
+        assert not _name_in_text("RAG", "this is a paragraph.")
+
+    def test_standalone_acronym_matches(self):
+        assert _name_in_text("RAG", "We tried RAG with embeddings.")
+        assert _name_in_text("RAG", "RAG is a technique.")  # leading
+        assert _name_in_text("RAG", "We tried RAG.")  # trailing punctuation
+
+    def test_multi_word_phrase(self):
+        assert _name_in_text("Vector Embeddings", "We use vector embeddings here.")
+        assert not _name_in_text("Vector Embeddings", "We discussed embeddings (no qualifier).")
+
+    def test_plural_strip_fallback(self):
+        # Concept "Vector Embeddings" should match source "vector embedding".
+        assert _name_in_text("Vector Embeddings", "Each vector embedding is dense.")
+        # But the singular 's' should only strip if the result is reasonable.
+        assert not _name_in_text(
+            "Vector Embeddings", "Vectorize the input."
+        )  # no "embedding" anywhere
+
+    def test_unrelated_concept_rejected(self):
+        # The hallucination case the filter is built to catch.
+        text = "We're building a Rust PDF tool. It uses pdfium for parsing."
+        assert not _name_in_text("KV Cache", text)
+        assert not _name_in_text("Vector Embeddings", text)
+        assert not _name_in_text("Retrieval-Augmented Generation", text)
+
+    def test_short_name_no_plural_strip(self):
+        # Don't strip 's' from very short names; "is" → "i" would always match.
+        assert not _name_in_text("Is", "this contains the word i alone.")
+
+    def test_empty_name_returns_false(self):
+        assert not _name_in_text("", "any text at all")
+
+    def test_punctuation_in_name(self):
+        # Concept names can contain punctuation; the filter should still find them.
+        assert _name_in_text("NSApp.delegate", "We override NSApp.delegate to ...")
+        assert _name_in_text("CI/CD", "Standard CI/CD pipeline runs on push.")
 
 
 # === Tests for LLM-aware distillation ===
@@ -345,7 +433,14 @@ class TestExtractConceptsLLM:
         )
 
     def test_successful_extraction(self):
-        chunks = [self._make_chunk("Vector embeddings are dense representations.")]
+        # Chunk content must contain both concept names from VALID_LLM_RESPONSE
+        # so the grounding filter accepts them.
+        chunks = [
+            self._make_chunk(
+                "Vector embeddings are dense representations. "
+                "Semantic search retrieves by meaning instead of keywords."
+            )
+        ]
 
         client = MagicMock(spec=LLMClient)
         client.generate.return_value = LLMResponse(
@@ -357,6 +452,7 @@ class TestExtractConceptsLLM:
         assert len(concepts) == 2
         assert stats.llm_calls == 1
         assert stats.parse_failures == 0
+        assert stats.rejected_by_grounding == 0
         assert concepts[0].name == "Vector Embeddings"
 
     def test_failed_llm_call(self):
@@ -387,7 +483,9 @@ class TestExtractConceptsLLM:
         assert stats.parse_failures == 1
 
     def test_deduplicates_across_batches(self):
-        chunks = [self._make_chunk("x" * 4000, i) for i in range(3)]
+        # Each chunk must contain "Same Concept" so the grounding filter
+        # accepts the LLM's emission across all batches; dedup then collapses.
+        chunks = [self._make_chunk("Same Concept appears here. " + "x" * 3500, i) for i in range(3)]
 
         client = MagicMock(spec=LLMClient)
         # Both batches return the same concept
