@@ -73,6 +73,34 @@ class ExtractionStats:
     concepts_extracted: int = 0
     parse_failures: int = 0
     fallbacks_to_heuristic: int = 0
+    rejected_by_grounding: int = 0
+
+
+def _name_in_text(name: str, text: str) -> bool:
+    """Return True iff ``name`` appears in ``text`` as a token-bounded substring.
+
+    The grounding filter's primary purpose is catching stock-AI hallucinations
+    (KV Cache, Vector Embeddings, RAG, etc.) the LLM emits unprompted in
+    projects whose source text doesn't mention them. Match rules:
+
+    - case-insensitive
+    - alphanumeric word boundaries on both sides — so "RAG" doesn't match
+      inside "storage" / "coverage" / "paragraph" / "drag"
+    - simple plural fallback: if the literal name doesn't match, try
+      stripping a trailing 's' from the last word ("Vector Embeddings"
+      grounded by source "vector embedding")
+    """
+    if not name:
+        return False
+    text_lower = text.lower()
+    candidates = [name.lower()]
+    if name.lower().endswith("s") and len(name) > 3:
+        candidates.append(name.lower()[:-1])
+    for cand in candidates:
+        pattern = r"(?<![A-Za-z0-9])" + re.escape(cand) + r"(?![A-Za-z0-9])"
+        if re.search(pattern, text_lower):
+            return True
+    return False
 
 
 def _extract_json_from_response(text: str) -> dict | None:
@@ -245,12 +273,24 @@ def extract_concepts_llm(
 
         concepts = _parse_llm_concepts(data, source_chunks, source_files)
 
+        # Grounding filter: reject concepts whose name doesn't appear in
+        # the source text the LLM saw. Catches stock-AI hallucinations
+        # (KV Cache, Vector Embeddings, RAG) the model emits unprompted
+        # in projects unrelated to those topics.
+        grounded = []
         for concept in concepts:
+            if _name_in_text(concept.name, batch_text):
+                grounded.append(concept)
+            else:
+                stats.rejected_by_grounding += 1
+                logger.info("grounding filter rejected '%s' (not in source text)", concept.name)
+
+        for concept in grounded:
             name_lower = concept.name.lower()
             if name_lower not in seen_names:
                 seen_names.add(name_lower)
                 all_concepts.append(concept)
 
-        stats.concepts_extracted += len(concepts)
+        stats.concepts_extracted += len(grounded)
 
     return all_concepts, stats

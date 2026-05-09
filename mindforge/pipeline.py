@@ -470,6 +470,11 @@ class MindForgePipeline:
 
         if stats.parse_failures > 0:
             print(f"  Warning: {stats.parse_failures} LLM parse failure(s)")
+        if stats.rejected_by_grounding > 0:
+            print(
+                f"  Grounding filter rejected {stats.rejected_by_grounding} "
+                f"concept(s) not present in source text"
+            )
 
         print(f"  LLM extracted {len(llm_concepts)} concepts")
         method = f"llm ({llm_config.provider}/{llm_config.model})"
