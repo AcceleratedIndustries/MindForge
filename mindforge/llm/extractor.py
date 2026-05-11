@@ -276,14 +276,20 @@ def extract_concepts_llm(
         # Grounding filter: reject concepts whose name doesn't appear in
         # the source text the LLM saw. Catches stock-AI hallucinations
         # (KV Cache, Vector Embeddings, RAG) the model emits unprompted
-        # in projects unrelated to those topics.
+        # in projects unrelated to those topics. For surviving concepts,
+        # narrow source_chunks to only the chunks whose content actually
+        # contains the name — produces accurate per-concept provenance
+        # so `mindforge show <slug> --sources` returns the supporting
+        # span instead of the whole batch.
         grounded = []
         for concept in concepts:
-            if _name_in_text(concept.name, batch_text):
-                grounded.append(concept)
-            else:
+            if not _name_in_text(concept.name, batch_text):
                 stats.rejected_by_grounding += 1
                 logger.info("grounding filter rejected '%s' (not in source text)", concept.name)
+                continue
+            supporting_chunks = [c for c in batch if _name_in_text(concept.name, c.content)]
+            concept.source_chunks = [c.id for c in supporting_chunks]
+            grounded.append(concept)
 
         for concept in grounded:
             name_lower = concept.name.lower()

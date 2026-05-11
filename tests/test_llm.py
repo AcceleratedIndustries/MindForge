@@ -261,6 +261,130 @@ class TestNameInText:
         assert _name_in_text("CI/CD", "Standard CI/CD pipeline runs on push.")
 
 
+# === Tests for per-concept provenance ===
+
+
+class TestPerConceptProvenance:
+    """Verify each extracted concept's source_chunks contains only chunks
+    whose content includes the concept name (not the full batch)."""
+
+    def _make_chunk(self, content: str, index: int = 0) -> Chunk:
+        return Chunk(
+            content=content,
+            source_file="test.md",
+            turn_index=index,  # 1 chunk == 1 turn for simplicity
+            chunk_index=0,
+            chunk_type="prose",
+        )
+
+    def test_concept_attributed_to_only_matching_chunks(self):
+        # Chunks 0 and 2 mention 'KV Cache'; chunk 1 does not.
+        chunks = [
+            self._make_chunk("We discussed KV Cache at length.", 0),
+            self._make_chunk("Unrelated stuff about pasta sauce.", 1),
+            self._make_chunk("Back to KV Cache for the conclusion.", 2),
+        ]
+        client = MagicMock(spec=LLMClient)
+        client.generate.return_value = LLMResponse(
+            content=json.dumps({"concepts": [{"name": "KV Cache", "definition": "A cache."}]}),
+            success=True,
+        )
+        concepts, stats = extract_concepts_llm(chunks, client, max_chars_per_call=10_000)
+        assert len(concepts) == 1
+        assert stats.rejected_by_grounding == 0
+        kv = concepts[0]
+        assert set(kv.source_chunks) == {chunks[0].id, chunks[2].id}
+        assert chunks[1].id not in kv.source_chunks
+
+    def test_single_chunk_match(self):
+        chunks = [
+            self._make_chunk("Only chunk 0 mentions Async Queue.", 0),
+            self._make_chunk("Chunk 1 talks about something else.", 1),
+        ]
+        client = MagicMock(spec=LLMClient)
+        client.generate.return_value = LLMResponse(
+            content=json.dumps(
+                {"concepts": [{"name": "Async Queue", "definition": "An async queue."}]}
+            ),
+            success=True,
+        )
+        concepts, _ = extract_concepts_llm(chunks, client, max_chars_per_call=10_000)
+        assert len(concepts) == 1
+        assert concepts[0].source_chunks == [chunks[0].id]
+
+    def test_plural_strip_fallback_in_attribution(self):
+        # Concept name is plural; source uses singular. The grounding filter's
+        # plural-strip should also drive the per-chunk attribution.
+        chunks = [
+            self._make_chunk("We use vector embedding for retrieval.", 0),
+            self._make_chunk("Unrelated paragraph.", 1),
+        ]
+        client = MagicMock(spec=LLMClient)
+        client.generate.return_value = LLMResponse(
+            content=json.dumps(
+                {"concepts": [{"name": "Vector Embeddings", "definition": "Dense reps."}]}
+            ),
+            success=True,
+        )
+        concepts, _ = extract_concepts_llm(chunks, client, max_chars_per_call=10_000)
+        assert len(concepts) == 1
+        assert concepts[0].source_chunks == [chunks[0].id]
+
+    def test_same_chunk_supports_multiple_concepts(self):
+        chunks = [
+            self._make_chunk("Vector Embeddings power Semantic Search here.", 0),
+            self._make_chunk("Just filler text.", 1),
+        ]
+        client = MagicMock(spec=LLMClient)
+        client.generate.return_value = LLMResponse(
+            content=VALID_LLM_RESPONSE,  # emits both Vector Embeddings and Semantic Search
+            success=True,
+        )
+        concepts, _ = extract_concepts_llm(chunks, client, max_chars_per_call=10_000)
+        assert len(concepts) == 2
+        # Both concepts cite chunk 0; neither cites chunk 1.
+        for c in concepts:
+            assert c.source_chunks == [chunks[0].id]
+
+    def test_token_boundary_prevents_substring_attribution(self):
+        # 'RAG' must not match inside 'storage' / 'paragraph'. So if the LLM
+        # emits 'RAG' as a concept and the only chunks contain 'storage', the
+        # concept should be REJECTED by grounding (zero supporting chunks),
+        # not silently attributed to those chunks.
+        chunks = [
+            self._make_chunk("Long-term storage is a paragraph apart.", 0),
+            self._make_chunk("More storage discussion here.", 1),
+        ]
+        client = MagicMock(spec=LLMClient)
+        client.generate.return_value = LLMResponse(
+            content=json.dumps(
+                {"concepts": [{"name": "RAG", "definition": "Retrieval-Augmented Generation."}]}
+            ),
+            success=True,
+        )
+        concepts, stats = extract_concepts_llm(chunks, client, max_chars_per_call=10_000)
+        assert len(concepts) == 0
+        assert stats.rejected_by_grounding == 1
+
+    def test_concept_in_all_chunks_lists_all_chunks(self):
+        # Sanity: when every chunk supports a concept, source_chunks contains
+        # all of them. This is the case where batch-level and per-chunk
+        # attribution produce the same result.
+        chunks = [
+            self._make_chunk("KV Cache discussion here.", 0),
+            self._make_chunk("More KV Cache analysis.", 1),
+            self._make_chunk("Final KV Cache notes.", 2),
+        ]
+        client = MagicMock(spec=LLMClient)
+        client.generate.return_value = LLMResponse(
+            content=json.dumps({"concepts": [{"name": "KV Cache", "definition": "A cache."}]}),
+            success=True,
+        )
+        concepts, _ = extract_concepts_llm(chunks, client, max_chars_per_call=10_000)
+        assert len(concepts) == 1
+        assert set(concepts[0].source_chunks) == {chunks[0].id, chunks[1].id, chunks[2].id}
+
+
 # === Tests for LLM-aware distillation ===
 
 
