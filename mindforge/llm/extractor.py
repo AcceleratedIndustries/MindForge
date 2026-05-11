@@ -280,7 +280,10 @@ def extract_concepts_llm(
         # narrow source_chunks to only the chunks whose content actually
         # contains the name — produces accurate per-concept provenance
         # so `mindforge show <slug> --sources` returns the supporting
-        # span instead of the whole batch.
+        # span instead of the whole batch. (The distiller's
+        # `_build_source_refs` derives turn_indices, chunk_id, and
+        # snippet from source_chunks, so this narrowing flows downstream
+        # without any distiller changes.)
         grounded = []
         for concept in concepts:
             if not _name_in_text(concept.name, batch_text):

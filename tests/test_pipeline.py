@@ -118,8 +118,9 @@ class TestProvenanceAccuracy:
         # multi-word title-case phrases per batch). 'KV Cache' is the only
         # multi-word title-case phrase in the concatenated batch, so it gets
         # extracted. Only the first assistant turn (index 1) mentions 'KV
-        # Cache'; the other three mention 'cache' (lowercase) so the
-        # token-bounded grounding match for 'KV Cache' rejects them.
+        # Cache'; the other three mention 'cache' without the 'KV ' prefix,
+        # so the token-bounded grounding match for 'KV Cache' rejects them
+        # (the match is case-insensitive, but it requires the full phrase).
         # Attribution should narrow to turn 1 only, not the full batch's
         # [1, 3, 5, 7].
         transcript = transcripts / "session.md"

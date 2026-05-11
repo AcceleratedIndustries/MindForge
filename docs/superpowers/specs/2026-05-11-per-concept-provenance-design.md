@@ -164,6 +164,8 @@ No new error modes are introduced. The implementation is a pure refinement of ex
 
 3. **Sub-chunk char-span attribution.** Currently a SourceRef points at a chunk; a future enhancement could narrow to a character offset within the chunk. Useful for very long chunks, less so for the current 200-600 char chunks. Out of scope unless evidence warrants it.
 
+4. **Cross-batch `source_chunks` merging.** When the same concept name is emitted by the LLM in multiple batches (e.g., a transcript large enough to span two batches that both mention "Vector Embeddings"), the existing `seen_names` dedup at `mindforge/llm/extractor.py:294-298` keeps only the first batch's `RawConcept` and drops the later ones. Pre-existing behavior, not introduced by this spec. But now that provenance is per-concept, this drop becomes more visible: a concept discussed across batches loses provenance from all batches except the first. Fix: merge `source_chunks` (preserving order, deduplicating) before dropping the duplicate, so per-concept provenance reflects every batch that mentioned the concept. Small follow-up; flagged during the post-implementation review on 2026-05-11.
+
 ## Open questions
 
 None at design time — every decision in this spec was explicitly chosen during the brainstorming session on 2026-05-11.
