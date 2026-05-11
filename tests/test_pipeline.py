@@ -1,5 +1,6 @@
 """Tests for the full MindForge pipeline."""
 
+import json
 from pathlib import Path
 
 from mindforge.config import MindForgeConfig
@@ -98,3 +99,105 @@ class TestPipeline:
         summary = result.summary()
         assert "MindForge Pipeline Complete" in summary
         assert "Concepts extracted" in summary
+
+
+class TestProvenanceAccuracy:
+    """End-to-end test that per-concept provenance narrows turn_indices to
+    supporting chunks, not the full batch."""
+
+    def test_turn_indices_narrowed_to_supporting_turns(self, tmp_path: Path) -> None:
+        # Build a transcript where 'KV Cache' is mentioned in exactly one
+        # assistant turn, with many other turns of unrelated content. After
+        # ingest, the concept's SourceRef should list only the supporting
+        # turn(s), not every turn the LLM saw in the same batch.
+
+        transcripts = tmp_path / "transcripts"
+        transcripts.mkdir()
+
+        # Mock LLM produces deterministic title-case extraction (cap of 3
+        # multi-word title-case phrases per batch). 'KV Cache' is the only
+        # multi-word title-case phrase in the concatenated batch, so it gets
+        # extracted. Only the first assistant turn (index 1) mentions 'KV
+        # Cache'; the other three mention 'cache' (lowercase) so the
+        # token-bounded grounding match for 'KV Cache' rejects them.
+        # Attribution should narrow to turn 1 only, not the full batch's
+        # [1, 3, 5, 7].
+        transcript = transcripts / "session.md"
+        transcript.write_text(
+            "Human: hi\n\n"
+            "Assistant: We use KV Cache for inference speedup.\n\n"
+            "Human: ok\n\n"
+            "Assistant: then we discussed cache hits in the buffer.\n\n"
+            "Human: continue\n\n"
+            "Assistant: eventually, cache eviction strategies came up.\n\n"
+            "Human: cool\n\n"
+            "Assistant: wrapping up with cache invalidation concerns.\n",
+            encoding="utf-8",
+        )
+
+        out = tmp_path / "out"
+        cfg = MindForgeConfig(
+            transcripts_dir=transcripts,
+            output_dir=out,
+            llm_provider="mock",
+        )
+        pipe = MindForgePipeline(cfg)
+        result = pipe.run()
+        assert result.concept_files_written >= 1
+
+        # Load concepts.json and find the KV Cache concept.
+        store = json.loads((out / "concepts.json").read_text(encoding="utf-8"))
+        kv = store.get("kv-cache")
+        assert kv is not None, "expected 'kv-cache' concept (mock client always emits title-case)"
+
+        sources = kv.get("sources", [])
+        assert len(sources) >= 1
+        # Crucial assertion: turn_indices contains the supporting turn(s) only.
+        # The transcript has 4 assistant turns (indices depend on the parser
+        # numbering; check that turn_indices is NOT the full set of assistant
+        # turns).
+        for src in sources:
+            assert isinstance(src["turn_indices"], list)
+            assert len(src["turn_indices"]) >= 1
+            # The full batch would have included all 4 assistant turns
+            # (indices roughly [1, 3, 5, 7] depending on parser conventions).
+            # The narrow result should have FEWER than 4 entries.
+            assert len(src["turn_indices"]) < 4, (
+                f"turn_indices too broad: {src['turn_indices']} - should "
+                "contain only the supporting turn(s), not every batch turn"
+            )
+
+    def test_unsupported_chunks_not_listed(self, tmp_path: Path) -> None:
+        # Two-transcript fixture: transcript A mentions 'KV Cache', transcript
+        # B does not. The KV Cache concept's source_files / sources should
+        # contain transcript A only.
+
+        transcripts = tmp_path / "transcripts"
+        transcripts.mkdir()
+
+        (transcripts / "a.md").write_text(
+            "Human: q\n\nAssistant: We use KV Cache for inference.\n",
+            encoding="utf-8",
+        )
+        (transcripts / "b.md").write_text(
+            "Human: q\n\nAssistant: Today's lunch was pasta.\n",
+            encoding="utf-8",
+        )
+
+        out = tmp_path / "out"
+        cfg = MindForgeConfig(
+            transcripts_dir=transcripts,
+            output_dir=out,
+            llm_provider="mock",
+        )
+        pipe = MindForgePipeline(cfg)
+        pipe.run()
+
+        store = json.loads((out / "concepts.json").read_text(encoding="utf-8"))
+        kv = store.get("kv-cache")
+        assert kv is not None
+        # The concept's sources should reference only a.md (the supporting
+        # transcript), not b.md.
+        source_paths = {src["transcript_path"] for src in kv["sources"]}
+        assert any(str(transcripts / "a.md") in p for p in source_paths)
+        assert not any(str(transcripts / "b.md") in p for p in source_paths)
